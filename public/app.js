@@ -641,13 +641,6 @@ function layoutHand(box, els) {
   const apply = (list) => {
     const step = Math.min(maxStep, stepFor(list));
     list.forEach((e, i) => { e.style.marginLeft = i === 0 ? '0' : `${step - cw + (e.dataset.gap ? SUIT_GAP : 0)}px`; });
-    // fan the cards like a hand held at the table: gentle tilt outward, edges dipping down
-    const n = list.length;
-    list.forEach((e, i) => {
-      const u = n > 1 ? (i / (n - 1)) * 2 - 1 : 0;
-      e.style.setProperty('--rot', `${(u * Math.min(14, n * 1.6)).toFixed(1)}deg`);
-      e.style.setProperty('--arc', `${(u * u * Math.min(10, n * 1.1)).toFixed(1)}px`);
-    });
   };
   if (els.length > 9 && stepFor(els) < cw * 0.55) {
     // split near the middle, preferring a suit boundary

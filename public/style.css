@@ -204,11 +204,11 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .hand { align-self: stretch; display: flex; flex-direction: column; align-items: center; min-height: calc(var(--ch) + 14px); padding-top: 20px; }
 .hrow { display: flex; justify-content: center; }
 .hand.two .hrow + .hrow { margin-top: calc(var(--ch) * -.52); }
-.hand .card { cursor: default; transition: transform .12s; transform-origin: 50% 130%; transform: translateY(var(--arc, 0)) rotate(var(--rot, 0deg)); }
+.hand .card { cursor: default; transition: transform .12s; }
 .hand .card.legal { cursor: pointer; }
-@media (hover: hover) { .hand .card.legal:hover { transform: translateY(calc(var(--arc, 0px) - 12px)) rotate(var(--rot, 0deg)); z-index: 2; } }
+@media (hover: hover) { .hand .card.legal:hover { transform: translateY(-12px); z-index: 2; } }
 .hand .card.dim { filter: brightness(.6); }
-.hand .card.sel { transform: translateY(calc(var(--arc, 0px) - 18px)) rotate(var(--rot, 0deg)); outline: 3px solid var(--accent); }
+.hand .card.sel { transform: translateY(-18px); outline: 3px solid var(--accent); }
 .hand.pick .card { cursor: pointer; }
 
 /* ---------- overlays */
