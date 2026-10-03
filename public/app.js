@@ -765,7 +765,7 @@ renderQuick();
 
 // ------------------------------------------------------------- language switch (flags) and settings
 
-const FLAGS = [['fa', 'flags/ir-lion-sun.svg', 'فارسی'], ['en', 'flags/us.svg', 'English']];
+const FLAGS = [['fa', 'flags/ir.svg', 'فارسی'], ['en', 'flags/us.svg', 'English']];
 function renderLangSwitches() {
   document.querySelectorAll('[data-lang-switch]').forEach((box) => {
     box.replaceChildren(...FLAGS.map(([code, src, name]) => h('button', {

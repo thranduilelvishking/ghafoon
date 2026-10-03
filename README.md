@@ -44,8 +44,8 @@ both say NO the round ends at once and the Hakem's team wins the original readin
 
 ## Languages (Persian / English)
 
-The game opens in Persian and each player can switch to English (and back) at any time with the flag buttons (the Lion
-and Sun flag for Persian, the US flag for English; on phones they are inside the gear panel). The choice is remembered
+The game opens in Persian and each player can switch to English (and back) at any time with the flag buttons (the plain green-white-red
+tricolour for Persian, the US flag for English; on phones they are inside the gear panel). The choice is remembered
 on that device, and players in the same room can use different languages, because only the screen text changes. The name
 "Ghafoon" is never translated.
 
