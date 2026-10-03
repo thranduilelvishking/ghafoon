@@ -165,7 +165,10 @@ function renderLobby() {
   }));
   const host = S.host === S.you;
   $('btn-start').disabled = !host;
-  $('lobby-msg').textContent = host ? '' : 'Waiting for the host to start…';
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  $('lobby-msg').textContent = local
+    ? `You are on ${location.host}, so this link only works on your own PC. Friends can open your public address instead and type the code ${S.room}.`
+    : host ? '' : 'Waiting for the host to start…';
 }
 
 const nameOf = (i) => S.seats[i].name;
