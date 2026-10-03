@@ -14,14 +14,14 @@ const PORT = +process.env.PORT || 3000;
 
 const BOT_NAMES = ['Arash', 'Bahar', 'Cyrus', 'Dara'];
 const TIMING = {
-  draw: 5500,
-  trickEnd: 1500,
+  draw: 3000,
+  trickEnd: 900,
   roundEndMax: 25000,
-  botBid: 900,
-  botHakem: 2200,
-  botHokm: 1600,
-  botPlay: 750,
-  botVote: 1300,
+  botBid: 500,
+  botHakem: 1200,
+  botHokm: 900,
+  botPlay: 450,
+  botVote: 800,
   voteMax: 25000,
   roomIdleDelete: 5 * 60 * 1000,
   takeoverAfter: 60 * 1000,
