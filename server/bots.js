@@ -108,14 +108,35 @@ function chooseHakem(hand16) {
 
 // ---------------------------------------------------------------- play
 
-// ctx: { seat, hand, plays, hokm, hakem, reading, tricks, played:Set }
+// Who has shown out of which suit: a player who did not follow the led suit is void in it.
+function knownVoids(trickLog, plays) {
+  const voids = [new Set(), new Set(), new Set(), new Set()];
+  for (const t of [...(trickLog || []), { plays }]) {
+    if (!t.plays.length) continue;
+    const led = suitOf(t.plays[0].card);
+    for (const p of t.plays) if (suitOf(p.card) !== led) voids[p.seat].add(led);
+  }
+  return voids;
+}
+
+// ctx: { seat, hand, plays, hokm, hakem, reading, tricks, played:Set, trickLog? }
 function choosePlay(ctx) {
   const { seat, hand, plays, hokm, played } = ctx;
   const legal = legalCards(hand, plays);
   if (legal.length === 1) return legal[0];
 
   const mine = new Set(hand);
-  // cards not yet seen by me (still in other hands, or in the bag)
+  const voids = knownVoids(ctx.trickLog, plays);
+  const cardsLeft = (suit) => {
+    // cards of a suit that are neither in my hand nor already played
+    let n = 0;
+    for (let r = 2; r <= ACE; r++) {
+      const c = suit * 13 + (r - 2);
+      if (!mine.has(c) && !played.has(c)) n++;
+    }
+    return n;
+  };
+  const trumpsUnseen = cardsLeft(hokm);
   const higherUnseen = (card) => {
     const s = suitOf(card);
     let n = 0;
@@ -129,24 +150,54 @@ function choosePlay(ctx) {
   const highest = (cards) => cards.reduce((a, b) => (rankOf(a) >= rankOf(b) ? a : b));
   const myTeamHakem = teamOf(ctx.hakem) === teamOf(seat);
   const suitLen = (s) => hand.filter((c) => suitOf(c) === s).length;
+  const partnerSeat = partner(seat);
+
+  // opponents still to act in this trick
+  const playedSeats = new Set(plays.map((p) => p.seat));
+  const remOpp = [0, 1, 2, 3].filter((x) => x !== seat && !playedSeats.has(x) && teamOf(x) !== teamOf(seat));
+  // an opponent who is known to be out of `suit` can ruff it if trumps are still out there
+  const canRuff = (x, suit) => suit !== hokm && voids[x].has(suit) && !voids[x].has(hokm) && trumpsUnseen > 0;
+
+  // chance that this currently-winning card of my partner gets beaten by someone still to play
+  const beatenChance = (card) => {
+    const suit = suitOf(card);
+    const led = suitOf(plays[0].card);
+    if (!remOpp.length) return 0;
+    if (suit !== led && suit !== hokm) return 1;
+    if (remOpp.some((x) => canRuff(x, led) && suit !== hokm)) return 1;
+    const holders = remOpp.filter((x) => !voids[x].has(suit)).length; // opponents who could hold a higher card
+    const hu = higherUnseen(card);
+    if (!hu || !holders) return 0;
+    return 1 - Math.pow(1 - holders / 3, hu);
+  };
+  const SAFE = 0.35;
+
+  // an opponent known to be void in this suit would ruff my lead
+  const exposed = (suit) => suit !== hokm && trumpsUnseen > 0 &&
+    [0, 1, 2, 3].some((x) => teamOf(x) !== teamOf(seat) && canRuff(x, suit));
 
   // ---- leading
   if (!plays.length) {
     const nonTrump = legal.filter((c) => suitOf(c) !== hokm);
     const trumps = legal.filter((c) => suitOf(c) === hokm);
-    // a card nobody can beat
-    const sure = legal.filter((c) => higherUnseen(c) === 0 && (suitOf(c) === hokm || !trumpsOutside(ctx, suitOf(c))));
+    const unexposed = nonTrump.filter((c) => !exposed(suitOf(c)));
+    const sure = legal.filter((c) => higherUnseen(c) === 0 && (suitOf(c) === hokm || !exposed(suitOf(c)) && !trumpsOutside(ctx, suitOf(c))));
     if (sure.length) return highest(sure);
     if (myTeamHakem && trumps.length && trumps.some((c) => higherUnseen(c) <= 1)) {
       return highest(trumps); // draw the opponents' trumps out
     }
-    const aces = nonTrump.filter((c) => rankOf(c) === ACE);
+    // give my partner a ruff: lead low in a suit they are void in (if they still have trumps)
+    if (!voids[partnerSeat].has(hokm)) {
+      const forPartner = unexposed.filter((c) => voids[partnerSeat].has(suitOf(c)) && rankOf(c) < ACE);
+      if (forPartner.length) return lowest(forPartner);
+    }
+    const aces = unexposed.filter((c) => rankOf(c) === ACE);
     if (aces.length) return aces[0];
-    if (nonTrump.length) {
+    const pool = unexposed.length ? unexposed : nonTrump;
+    if (pool.length) {
       // lead low from the shortest suit
-      const shortest = nonTrump.reduce((a, b) => (suitLen(suitOf(a)) <= suitLen(suitOf(b)) ? a : b));
-      const sameSuit = nonTrump.filter((c) => suitOf(c) === suitOf(shortest));
-      return lowest(sameSuit);
+      const shortest = pool.reduce((a, b) => (suitLen(suitOf(a)) <= suitLen(suitOf(b)) ? a : b));
+      return lowest(pool.filter((c) => suitOf(c) === suitOf(shortest)));
     }
     return lowest(trumps);
   }
@@ -155,20 +206,21 @@ function choosePlay(ctx) {
   const led = suitOf(plays[0].card);
   const winnerSeat = trickWinner(plays, hokm);
   const winnerCard = plays.find((p) => p.seat === winnerSeat).card;
-  const partnerWinning = winnerSeat === partner(seat);
+  const partnerWinning = winnerSeat === partnerSeat;
   const lastToPlay = plays.length === 3;
-  const follows = legal.every((c) => suitOf(c) === led) && suitOf(legal[0]) === led;
+  const follows = suitOf(legal[0]) === led;
+  const partnerSafe = partnerWinning && (lastToPlay || beatenChance(winnerCard) < SAFE);
 
   const beats = (c) => trickWinner([...plays, { seat, card: c }], hokm) === seat;
 
   if (follows) {
-    if (partnerWinning && (lastToPlay || higherUnseen(winnerCard) === 0)) return lowest(legal);
+    if (partnerSafe) return lowest(legal);
     const winners = legal.filter(beats);
     if (winners.length) {
       if (lastToPlay) return lowest(winners);
-      const safe = winners.filter((c) => higherUnseen(c) === 0);
+      const safe = winners.filter((c) => higherUnseen(c) === 0 && !remOpp.some((x) => canRuff(x, led)));
       if (safe.length) return lowest(safe);
-      if (partnerWinning) return lowest(legal);
+      if (partnerWinning) return lowest(legal); // not certain, but not worth wasting a high card either
       // opponents still to play: commit a strong card, or save the trick-takers
       const strong = winners.filter((c) => rankOf(c) >= QUEEN || higherUnseen(c) <= 1);
       if (strong.length) return lowest(strong);
@@ -181,16 +233,16 @@ function choosePlay(ctx) {
   const discardable = legal.filter((c) => suitOf(c) !== hokm);
   const pickDiscard = () => {
     if (!discardable.length) return lowest(legal);
-    // give up the suit we hold the least of, lowest card first
+    // give up the suit we hold the least of, lowest card first (never a lone ace/king if avoidable)
     const worst = discardable.reduce((a, b) => {
-      const la = suitLen(suitOf(a));
-      const lb = suitLen(suitOf(b));
+      const la = suitLen(suitOf(a)) + (rankOf(a) >= KING ? 5 : 0);
+      const lb = suitLen(suitOf(b)) + (rankOf(b) >= KING ? 5 : 0);
       if (la !== lb) return la < lb ? a : b;
       return rankOf(a) <= rankOf(b) ? a : b;
     });
     return lowest(discardable.filter((c) => suitOf(c) === suitOf(worst)));
   };
-  if (partnerWinning && (lastToPlay || suitOf(winnerCard) === hokm)) return pickDiscard();
+  if (partnerSafe) return pickDiscard();
   if (trumpsInHand.length) {
     const winners = trumpsInHand.filter(beats);
     if (winners.length) return lowest(winners);
