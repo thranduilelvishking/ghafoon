@@ -122,7 +122,7 @@ class Game {
     this.round = 0;
     this.sardast = 0;
     this.pile = null;
-    this.phase = 'idle'; // idle | draw | reading | hakem | play | trickEnd | roundEnd | gameOver
+    this.phase = 'idle'; // idle | draw | reading | hakem (discard) | hokm | play | trickEnd | roundEnd | gameOver
     this.winner = null;
     this.roundResult = null;
     this.draw = null;
@@ -214,11 +214,10 @@ class Game {
     }
   }
 
-  // The Hakem discards 4 cards into the bag and names Hokm.
-  hakemDone(seat, discards, hokm) {
-    if (this.phase !== 'hakem') throw new GameError('not hakem phase');
+  // Step 1: the Hakem discards any 4 cards face down. They are the bag (one trick for the Hakem's team).
+  hakemDiscard(seat, discards) {
+    if (this.phase !== 'hakem') throw new GameError('not the discard phase');
     if (seat !== this.hakem) throw new GameError('you are not the hakem');
-    if (!Number.isInteger(hokm) || hokm < 0 || hokm > 3) throw new GameError('bad hokm');
     if (!Array.isArray(discards) || discards.length !== 4 || new Set(discards).size !== 4) {
       throw new GameError('discard exactly 4 cards');
     }
@@ -226,12 +225,27 @@ class Game {
     if (!discards.every((c) => hand.includes(c))) throw new GameError('card not in hand');
     this.hands[seat] = hand.filter((c) => !discards.includes(c));
     this.bag = discards.slice();
+    this.tricks[teamOf(seat)] = 1;
+    this.phase = 'hokm';
+  }
+
+  // Step 2: the Hakem names Hokm and play begins.
+  chooseHokm(seat, hokm) {
+    if (this.phase !== 'hokm') throw new GameError('discard first, then name Hokm');
+    if (seat !== this.hakem) throw new GameError('you are not the hakem');
+    if (!Number.isInteger(hokm) || hokm < 0 || hokm > 3) throw new GameError('bad hokm');
     this.hokm = hokm;
-    this.tricks[teamOf(seat)] = 1; // the bag counts as a trick for the Hakem's team
     this.leader = this.reading === SHEET ? this.hakem : this.sardast;
     this.turn = this.leader;
     this.plays = [];
     this.phase = 'play';
+  }
+
+  // Both steps at once (used by bots' self-play and tests).
+  hakemDone(seat, discards, hokm) {
+    if (!Number.isInteger(hokm) || hokm < 0 || hokm > 3) throw new GameError('bad hokm');
+    this.hakemDiscard(seat, discards);
+    this.chooseHokm(seat, hokm);
   }
 
   legalFor(seat) {

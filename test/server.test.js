@@ -38,8 +38,9 @@ function client(port, { auto = true } = {}) {
     if (m.phase === 'reading' && m.turn === me) send({ t: 'bid', value: bots.chooseBid(m.hand, m.highest) });
     else if (m.phase === 'hakem' && m.hakem === me) {
       const { hokm, discards } = bots.chooseHakem(m.hand);
-      send({ t: 'hakem', hokm, discards });
-    } else if (m.phase === 'play' && m.turn === me) {
+      c.planned = hokm;
+      send({ t: 'discard', discards });
+    } else if (m.phase === 'hokm' && m.hakem === me) send({ t: 'hokm', hokm: c.planned }); else if (m.phase === 'play' && m.turn === me) {
       const played = new Set();
       send({ t: 'play', card: bots.choosePlay({ seat: me, hand: m.hand, plays: m.plays, hokm: m.hokm, hakem: m.hakem, reading: m.reading, tricks: m.tricks, played: c.played }) });
     } else if (m.phase === 'roundEnd') send({ t: 'ready' });

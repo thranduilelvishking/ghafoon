@@ -19,10 +19,11 @@ const TIMING = {
   roundEndMax: 25000,
   botBid: 900,
   botHakem: 2200,
+  botHokm: 1600,
   botPlay: 750,
   roomIdleDelete: 5 * 60 * 1000,
   takeoverAfter: 60 * 1000,
-  ...(process.env.GHAFOON_FAST ? { draw: 50, trickEnd: 20, roundEndMax: 100, botBid: 5, botHakem: 5, botPlay: 5 } : {}),
+  ...(process.env.GHAFOON_FAST ? { draw: 50, trickEnd: 20, roundEndMax: 100, botBid: 5, botHakem: 5, botHokm: 5, botPlay: 5 } : {}),
 };
 
 const rooms = new Map();
@@ -254,6 +255,9 @@ class Room {
       case 'hakem':
         if (this.isBot(g.hakem)) this.after(TIMING.botHakem + jitter(), () => this.botStep(phase));
         return;
+      case 'hokm':
+        if (this.isBot(g.hakem)) this.after(TIMING.botHokm + jitter(), () => this.botStep(phase));
+        return;
       case 'play':
         if (this.isBot(g.turn)) this.after(TIMING.botPlay + jitter(), () => this.botStep(phase));
         return;
@@ -289,7 +293,13 @@ class Room {
       const s = g.hakem;
       if (!this.isBot(s)) return;
       const { hokm, discards } = bots.chooseHakem(g.hands[s]);
-      g.hakemDone(s, discards, hokm);
+      this.plannedHokm = { round: g.round, hokm }; // the suit the bag was chosen for
+      g.hakemDiscard(s, discards);
+    } else if (g.phase === 'hokm') {
+      const s = g.hakem;
+      if (!this.isBot(s)) return;
+      const plan = this.plannedHokm && this.plannedHokm.round === g.round ? this.plannedHokm.hokm : bots.bestHokm(g.hands[s]).hokm;
+      g.chooseHokm(s, plan);
     } else if (g.phase === 'play') {
       const s = g.turn;
       if (!this.isBot(s)) return;
@@ -333,9 +343,13 @@ class Room {
         if (!g) return;
         g.bid(seat, msg.value);
         return this.changed();
-      case 'hakem':
+      case 'discard':
         if (!g) return;
-        g.hakemDone(seat, msg.discards, msg.hokm);
+        g.hakemDiscard(seat, msg.discards);
+        return this.changed();
+      case 'hokm':
+        if (!g) return;
+        g.chooseHokm(seat, msg.hokm);
         return this.changed();
       case 'play':
         if (!g) return;

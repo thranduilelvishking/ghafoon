@@ -215,9 +215,12 @@ function cardEl(c, cls = '') {
     h('span', { class: 'pip' }, SUITS[s]));
 }
 
+let prevPhase = null;
+
 function renderGame() {
   if (S.round !== lastRound) { selected = new Set(); pickedHokm = null; lastRound = S.round; }
-  if (S.phase !== 'hakem') { selected = new Set(); pickedHokm = null; }
+  if (S.phase !== 'hakem') selected = new Set();
+  if (S.phase !== 'hokm') pickedHokm = null;
   $('g-code').textContent = S.room;
   renderScore();
   renderTable();
@@ -225,6 +228,22 @@ function renderGame() {
   renderActions();
   renderHand();
   renderOverlay();
+  if (S.phase === 'play' && (prevPhase === 'hokm' || prevPhase === 'hakem') && S.hokm != null) showHokmBanner();
+  prevPhase = S.phase;
+}
+
+let bannerTimer = null;
+function showHokmBanner() {
+  const b = $('banner');
+  b.replaceChildren(
+    h('span', { class: 'w' }, 'Hokm'),
+    h('span', { class: `s ${isRed(S.hokm) ? 'red' : ''}` }, SUITS[S.hokm]),
+    h('div', { class: 'by' }, `${nameOf(S.hakem)} named ${SUIT_NAMES[S.hokm]}`));
+  b.classList.add('hidden');
+  void b.offsetWidth; // restart the animation
+  b.classList.remove('hidden');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.add('hidden'), 2700);
 }
 
 function renderScore() {
@@ -238,39 +257,71 @@ function renderScore() {
   );
 }
 
+const CROWN = () => {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 34 26');
+  svg.setAttribute('class', 'crown');
+  svg.setAttribute('aria-label', 'Hakem');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M3 21 L1.5 6 L10 13 L17 2 L24 13 L32.5 6 L31 21 Z');
+  path.setAttribute('fill', '#f2c94c');
+  path.setAttribute('stroke', '#a87b0f');
+  path.setAttribute('stroke-width', '1.6');
+  path.setAttribute('stroke-linejoin', 'round');
+  const band = document.createElementNS(ns, 'rect');
+  band.setAttribute('x', '3'); band.setAttribute('y', '21'); band.setAttribute('width', '28'); band.setAttribute('height', '4');
+  band.setAttribute('rx', '1.5'); band.setAttribute('fill', '#d4a017'); band.setAttribute('stroke', '#a87b0f'); band.setAttribute('stroke-width', '1.2');
+  svg.append(path, band);
+  return svg;
+};
+
 function seatPlate(i) {
   const rel = (i - S.you + 4) % 4;
   const info = S.seats[i];
   const badges = [];
   if (i === S.sardast) badges.push(h('span', { class: 'badge sardast' }, 'Sardast'));
   if (i === S.dealer) badges.push(h('span', { class: 'badge dealer' }, 'Dealer'));
-  if (i === S.hakem && S.phase !== 'reading' && S.phase !== 'draw') badges.push(h('span', { class: 'badge hakem' }, 'Hakem'));
   if (info.kind === 'bot') badges.push(h('span', { class: 'badge bot' }, 'Bot'));
   if (info.kind === 'away') badges.push(h('span', { class: 'badge bot' }, 'Away, bot'));
-  let bid = '';
+
+  // big, bold reading above the bubble while reading; afterwards only the Hakem keeps theirs, with a crown
+  const hakemKnown = S.hakem != null && S.phase !== 'reading' && S.phase !== 'draw';
+  let chip = null;
   if (S.phase === 'reading' || S.phase === 'draw') {
     const b = S.bids[i];
-    bid = b == null ? (S.turn === i && S.phase === 'reading' ? '…' : '') : b === 0 ? 'Pass' : b === 13 ? 'Sheet' : String(b);
-  } else if (i === S.hakem) bid = S.reading === 13 ? 'Sheet' : `Reading ${S.reading}`;
-  const turn = (S.phase === 'reading' || S.phase === 'play') && S.turn === i || (S.phase === 'hakem' && S.hakem === i);
+    if (b == null) { if (S.turn === i && S.phase === 'reading') chip = h('div', { class: 'chip wait' }, '…'); }
+    else if (b === 0) chip = h('div', { class: 'chip pass' }, 'PASS');
+    else if (b === 13) chip = h('div', { class: 'chip sheet' }, 'SHEET');
+    else chip = h('div', { class: 'chip' }, b);
+  } else if (hakemKnown && i === S.hakem) {
+    chip = S.reading === 13 ? h('div', { class: 'chip sheet' }, 'SHEET') : h('div', { class: 'chip' }, S.reading);
+  }
+  const crown = hakemKnown && i === S.hakem ? CROWN() : null;
+
+  const turn = ((S.phase === 'reading' || S.phase === 'play') && S.turn === i) || ((S.phase === 'hakem' || S.phase === 'hokm') && S.hakem === i);
   const backs = rel === 0 ? null : h('div', { class: 'backs' }, Array.from({ length: Math.min(S.counts[i], 16) }, () => h('div', { class: 'back' })));
   return h('div', { class: `seat ${POS[rel]}` },
-    rel === 2 || rel === 1 || rel === 3 ? backs : null,
-    h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}` },
+    backs,
+    h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}`, title: crown ? 'Hakem' : null },
+      crown || chip ? h('div', { class: 'over' }, crown, chip) : null,
       h('div', { class: 'nm' }, info.name + (i === S.you ? ' (you)' : '')),
       h('div', { class: 'badges' }, badges),
-      h('div', { class: 'bid' }, bid),
       rel === 0 ? null : h('div', { class: 'cnt' }, `${S.counts[i]} cards`),
     ),
   );
 }
 
 function renderTable() {
-  const t = $('table');
-  const kids = [];
-  for (let i = 0; i < 4; i++) kids.push(seatPlate(i));
+  const seatAt = [];
+  for (let i = 0; i < 4; i++) seatAt[(i - S.you + 4) % 4] = seatPlate(i);
+  $('trow').replaceChildren(seatAt[2]);
+  $('seat-left').replaceChildren(seatAt[1]);
+  $('seat-right').replaceChildren(seatAt[3]);
+  $('seat-me').replaceChildren(seatAt[0]);
 
-  const center = h('div', { class: 'center' });
+  const center = $('center');
+  center.replaceChildren();
   if (S.phase === 'draw' && S.draw) {
     center.append(...drawPiles());
   } else {
@@ -280,10 +331,10 @@ function renderTable() {
       center.append(h('div', { class: `slot ${POS[rel]} ${S.trickWinner === p.seat ? 'win' : ''}` }, cardEl(p.card)));
     }
   }
-  kids.push(center);
 
   // info panel
-  const info = h('div', { class: 'info' });
+  const info = $('info');
+  info.replaceChildren();
   if (S.hokm != null) {
     info.append(h('div', { class: 'hokm-box' },
       h('div', { class: 'lab' }, 'Hokm'),
@@ -304,13 +355,12 @@ function renderTable() {
   } else if (S.round > 1 && S.shuffleInfo && S.shuffleInfo.kind === 'stacked' && S.phase === 'reading') {
     info.append(h('div', { class: 'tricks-box' }, `Stacks kept, cut ${S.shuffleInfo.cuts}×`));
   }
-  kids.push(info);
 
+  const last = $('last');
+  last.replaceChildren();
   if (S.lastTrick && S.phase === 'play') {
-    kids.push(h('div', { class: 'last' }, 'Last trick',
-      h('div', { class: 'cards' }, S.lastTrick.plays.map((p) => cardEl(p.card, `tiny ${p.seat === S.lastTrick.winner ? 'win' : ''}`)))));
+    last.append('Last trick', h('div', { class: 'cards' }, S.lastTrick.plays.map((p) => cardEl(p.card, `tiny ${p.seat === S.lastTrick.winner ? 'win' : ''}`))));
   }
-  t.replaceChildren(...kids);
 }
 
 function drawPiles() {
@@ -343,8 +393,11 @@ function renderStatus() {
     case 'reading': msg = S.turn === me ? 'Your turn to read' : `${nameOf(S.turn)} is reading…`; break;
     case 'hakem':
       msg = S.hakem === me
-        ? `You won the reading with ${S.reading === 13 ? 'Sheet' : S.reading}${S.forced ? ' (forced 7)' : ''}: pick 4 cards for the bag and name Hokm`
-        : `${nameOf(S.hakem)} is picking the bag and Hokm…`;
+        ? `You are the Hakem with ${S.reading === 13 ? 'Sheet' : S.reading}${S.forced ? ' (forced 7)' : ''}: pick 4 cards for the bag, then press Discard`
+        : `${nameOf(S.hakem)} is picking the bag…`;
+      break;
+    case 'hokm':
+      msg = S.hakem === me ? 'Now pick the Hokm suit and press Hokm' : `${nameOf(S.hakem)} is choosing Hokm…`;
       break;
     case 'play':
       if (S.turn === me) {
@@ -368,7 +421,11 @@ function renderActions() {
     g.append(h('button', { class: 'bidbtn', onclick: () => send({ t: 'bid', value: 0 }) }, 'Pass'));
     box.append(g);
   } else if (S.phase === 'hakem' && S.hakem === S.you) {
-    const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, `Bag ${selected.size}/4 · Hokm:`));
+    box.append(h('div', { class: 'group' },
+      h('span', { class: 'lab' }, `Bag: ${selected.size} / 4 cards`),
+      h('button', { class: 'primary', disabled: selected.size !== 4, onclick: () => send({ t: 'discard', discards: [...selected] }) }, 'Discard')));
+  } else if (S.phase === 'hokm' && S.hakem === S.you) {
+    const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, 'Hokm:'));
     for (let s = 0; s < 4; s++) {
       g.append(h('button', {
         class: `suitbtn ${isRed(s) ? 'red' : ''} ${pickedHokm === s ? 'on' : ''}`,
@@ -376,10 +433,7 @@ function renderActions() {
         onclick: () => { pickedHokm = s; renderActions(); },
       }, SUITS[s]));
     }
-    g.append(h('button', {
-      class: 'primary', disabled: selected.size !== 4 || pickedHokm == null,
-      onclick: () => send({ t: 'hakem', discards: [...selected], hokm: pickedHokm }),
-    }, 'Done'));
+    g.append(h('button', { class: 'primary', disabled: pickedHokm == null, onclick: () => send({ t: 'hokm', hokm: pickedHokm }) }, 'Hokm'));
     box.append(g);
   }
 }

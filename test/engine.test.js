@@ -268,3 +268,24 @@ test('bot-only games always complete and conserve all 52 cards each round', () =
     assert.strictEqual(new Set(g.pile).size, 52);
   }
 });
+
+test('hakem flow is two steps: discard first (bag), then name hokm', () => {
+  const hand = Array.from({ length: 12 }, (_, i) => i);
+  const g = setup({ sardast: 1, hands: [[], hand, [], []], yard: [20, 21, 22, 23] });
+  g.bid(1, 8); g.bid(2, 0); g.bid(3, 0); g.bid(0, 0);
+  assert.strictEqual(g.phase, 'hakem');
+  assert.throws(() => g.chooseHokm(1, H), /discard first/);
+  assert.throws(() => g.hakemDiscard(2, [0, 1, 2, 3]), /not the hakem|you are not/);
+  g.hakemDiscard(1, [0, 1, 2, 3]);
+  assert.strictEqual(g.phase, 'hokm');
+  assert.strictEqual(g.hands[1].length, 12);
+  assert.strictEqual(g.tricks[1], 1);
+  assert.strictEqual(g.hokm, null);
+  assert.throws(() => g.hakemDiscard(1, [4, 5, 6, 7]));
+  assert.throws(() => g.chooseHokm(1, 9));
+  assert.throws(() => g.chooseHokm(0, H));
+  g.chooseHokm(1, K);
+  assert.strictEqual(g.phase, 'play');
+  assert.strictEqual(g.hokm, K);
+  assert.strictEqual(g.turn, 1); // sardast leads
+});
