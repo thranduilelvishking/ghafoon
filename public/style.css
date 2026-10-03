@@ -105,11 +105,18 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .card.tiny { --cw: 28px; }
 
 .center { position: absolute; inset: 0; pointer-events: none; }
-.slot { position: absolute; }
-.slot.p0 { left: 50%; bottom: 84px; transform: translateX(-50%); }
-.slot.p1 { left: clamp(88px, 17vw, 160px); top: 56%; transform: translateY(-50%); }
-.slot.p2 { left: 50%; top: calc(var(--top-off, 0px) + var(--ch) * .5 + 78px); transform: translateX(-50%); }
-.slot.p3 { right: clamp(88px, 17vw, 160px); top: 56%; transform: translateY(-50%); }
+/* played cards: a tight cross in the middle of the table (top / left / right / bottom = that player's side) */
+.slot { position: absolute; left: 50%; top: calc(50% + var(--cy, 50px)); }
+.slot.p2 { transform: translate(-50%, calc(-100% + var(--ch) * .1)); }
+.slot.p0 { transform: translate(-50%, calc(var(--ch) * -.1)); }
+.slot.p1 { transform: translate(calc(-100% - var(--cw) * .6), -50%); }
+.slot.p3 { transform: translate(calc(var(--cw) * .6), -50%); }
+/* first-ace draw piles stay next to each player */
+.dslot { position: absolute; }
+.dslot.p0 { left: 50%; bottom: 84px; transform: translateX(-50%); }
+.dslot.p1 { left: clamp(88px, 17vw, 160px); top: 56%; transform: translateY(-50%); }
+.dslot.p2 { left: 50%; top: calc(var(--top-off, 0px) + var(--ch) * .5 + 78px); transform: translateX(-50%); }
+.dslot.p3 { right: clamp(88px, 17vw, 160px); top: 56%; transform: translateY(-50%); }
 .slot .card { animation: drop .25s ease-out; }
 .slot.win .card { outline: 3px solid var(--accent); box-shadow: 0 0 16px #e8c15aaa; }
 @keyframes drop { from { transform: translateY(-14px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -203,9 +210,10 @@ button.small { padding: 6px 10px; font-size: 13px; }
   .seat.p0 { bottom: 4px; } .seat.p2 { top: 4px; }
   .seat.p0 .plate, .seat.p2 .plate { display: flex; align-items: center; gap: 8px; white-space: nowrap; max-width: none; }
   .seat.p0 .plate .nm, .seat.p2 .plate .nm { max-width: 120px; }
-  .slot.p2 { top: 40px; } .slot.p0 { bottom: 38px; }
+  :root { --cy: 0px; }
+  .dslot.p2 { top: 40px; } .dslot.p0 { bottom: 38px; }
   .seat.p1, .seat.p3 { top: 50%; }
-  .slot.p1, .slot.p3 { top: 50%; }
+  .dslot.p1, .dslot.p3 { top: 50%; }
   .info { left: 6px; right: auto; top: 38px; flex-direction: row; flex-wrap: nowrap; align-items: center; font-size: 10px; gap: 6px; }
   .hokm-box { display: flex; align-items: center; gap: 6px; padding: 2px 8px; }
   .hokm-box .lab { display: none; }

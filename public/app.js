@@ -325,7 +325,7 @@ function drawPiles() {
   reveals.slice(0, n).forEach((r) => piles[r.seat].push(r.card));
   const els = piles.map((cards, i) => {
     const rel = (i - S.you + 4) % 4;
-    return h('div', { class: `slot ${POS[rel]}` }, h('div', { class: 'drawpile' }, cards.map((c) => cardEl(c, 'mini'))));
+    return h('div', { class: `dslot ${POS[rel]}` }, h('div', { class: 'drawpile' }, cards.map((c) => cardEl(c, 'mini'))));
   });
   return els;
 }
