@@ -186,7 +186,7 @@ function renderLobby() {
     const rel = (i - S.you + 4) % 4;
     const me = i === S.you;
     const mine = i % 2 === myTeam;
-    const role = me ? 'You' : rel === 2 ? 'Your partner' : 'Opponent';
+    const role = (me ? 'You' : rel === 2 ? 'Your partner' : 'Opponent') + (i === S.host ? ' · Host' : '');
     return h('div', {
       class: `lseat ${POS[rel]} ${mine ? 'us' : 'them'} ${s.kind === 'empty' ? 'empty' : ''} ${me ? 'me' : ''}`,
       role: s.kind === 'empty' ? 'button' : null,
@@ -211,7 +211,7 @@ function renderLobby() {
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   $('lobby-msg').textContent = local
     ? `You are on ${location.host}, so this link only works on your own PC. Friends can open your public address instead and type the code ${S.room}.`
-    : host ? '' : 'Waiting for the host to start…';
+    : host ? 'You are the host: press Start game when everyone is seated.' : `Waiting for ${S.seats[S.host] ? S.seats[S.host].name : 'the host'} (the host) to start…`;
 }
 
 const nameOf = (i) => S.seats[i].name;

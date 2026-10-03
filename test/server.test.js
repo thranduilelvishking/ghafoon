@@ -155,3 +155,31 @@ test('names: duplicates get a suffix, rename works, empty name falls back to the
   a.ws.close(); b.ws.close(); c.ws.close();
   server.close();
 });
+
+test('the host is whoever created the room, even after moving seats; the role passes on only when they leave', async () => {
+  const { server, port } = await listen();
+  const a = await client(port, { auto: false });
+  a.send({ t: 'join', create: true, name: 'Creator' });
+  await a.waitFor((x) => x.joined);
+  // the creator moves to seat 2, so the next arrival gets seat 0 (a lower seat number than the creator)
+  a.send({ t: 'sit', seat: 2 });
+  await a.waitFor((x) => x.state && x.state.you === 2);
+  const b = await client(port, { auto: false });
+  b.send({ t: 'join', room: a.joined.room, name: 'Friend' });
+  await b.waitFor((x) => x.joined);
+  assert.strictEqual(b.joined.seat, 0);
+  await a.waitFor((x) => x.state.seats[0].name === 'Friend');
+  assert.strictEqual(a.state.host, 2, 'the creator stays host');
+  assert.strictEqual(b.state.host, 2);
+  b.send({ t: 'start' });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.ok(b.errors.length > 0, 'the friend cannot start');
+  assert.strictEqual(a.state.mode, 'lobby');
+  // the creator leaves: the friend becomes host and can start
+  a.send({ t: 'leave' });
+  await b.waitFor((x) => x.state.host === 0 && x.state.seats[2].kind === 'empty');
+  b.send({ t: 'start' });
+  await b.waitFor((x) => x.state.mode === 'game');
+  b.ws.close(); a.ws.close();
+  server.close();
+});

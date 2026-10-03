@@ -50,6 +50,7 @@ class Room {
     this.timer = null;
     this.ready = new Set();
     this.deleteTimer = null;
+    this.hostToken = null;
   }
 
   // ---- seats
@@ -66,9 +67,16 @@ class Room {
   anyConnected() {
     return [0, 1, 2, 3].some((i) => this.isConnected(i));
   }
+  // The host is whoever created the room (tracked by their token, so moving seats does not change it).
+  // If they are gone, the role passes to the first person still connected and stays with them.
   hostSeat() {
-    for (let i = 0; i < 4; i++) if (this.isConnected(i)) return i;
-    return -1;
+    let i = [0, 1, 2, 3].find((k) => this.isConnected(k) && this.seats[k].human.token === this.hostToken);
+    if (i === undefined) {
+      i = [0, 1, 2, 3].find((k) => this.isConnected(k));
+      if (i === undefined) return -1;
+      this.hostToken = this.seats[i].human.token;
+    }
+    return i;
   }
   seatName(i) {
     const h = this.seats[i].human;
@@ -464,6 +472,7 @@ function handleJoin(ws, msg) {
       return send(ws, { t: 'error', msg: 'Room is full', fatal: true });
     }
   }
+  if (msg.create) room.hostToken = room.seats[seat].human.token;
   send(ws, { t: 'joined', room: room.code, token: room.seats[seat].human.token, seat });
   clearTimeout(room.deleteTimer);
   room.deleteTimer = null;
