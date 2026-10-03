@@ -40,7 +40,7 @@ function fullShuffle(deck = freshDeck(), rand = randInt) {
 // How much a light overhand-style disturbance breaks up the previous round's stacks, as the fraction of the
 // 51 links between neighbouring cards that get broken. 0 keeps the stacks completely intact (apart from the cuts);
 // 1 would be roughly a full shuffle. Tricks mostly stay together at 0.2: packets average about 5 cards.
-const MIX_LINKS = 0.2;
+const MIX_LINKS = 0;
 
 // Takes the deck apart at `links * 51` random places and puts the packets back in reverse order,
 // each packet keeping its own order: what an overhand shuffle does.

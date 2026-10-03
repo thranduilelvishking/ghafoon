@@ -39,7 +39,9 @@ one): 26 points if they do, 26 to the opponents if they lose a single trick. Rea
 The first round of a game gets a full Fisher-Yates shuffle (after the "first Ace" draw that picks the Sardast).
 Every later round does **not** re-randomise the cards. The previous round's cards are collected as they
 fell: the bag, then each trick's four cards stacked on the one before it, then any cards left in hands.
-That pile gets a light overhand-style disturbance (it breaks about 20% of the links between neighbouring cards,
-`MIX_LINKS` in `server/engine.js`; 0 keeps the stacks fully intact), is cut once or twice at arbitrary positions
-(a break can land mid-trick) and is dealt in the rule's packets (12 to the Sardast, 1 to the yard, and so on). Nothing inspects or steers the resulting hands;
-the long suits and voids simply come from the stacks.
+That pile is cut once or twice at arbitrary positions (a break can land mid-trick), exactly as people do at a real
+table, and is dealt in the rule's packets (12 to the Sardast, 1 to the yard, and so on). Nothing inspects or steers
+the resulting hands; the long suits and voids simply come from the stacks.
+
+`MIX_LINKS` in `server/engine.js` is 0 (stack and cut only). A value like 0.2 would add a light overhand shuffle that
+breaks about 20% of the links between neighbouring cards.

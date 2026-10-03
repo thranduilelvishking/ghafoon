@@ -374,7 +374,7 @@ function renderTable() {
       h('div', { class: ok }, `${mineIsHakem ? 'Them' : 'Us'} (bust): ${S.tricks[1 - hteam]} / ${bust}`),
     ));
   } else if (S.round > 1 && S.shuffleInfo && S.shuffleInfo.kind === 'stacked' && S.phase === 'reading') {
-    info.append(h('div', { class: 'tricks-box' }, `Stacks kept, light shuffle, cut ${S.shuffleInfo.cuts}×`));
+    info.append(h('div', { class: 'tricks-box' }, `Stacks kept, cut ${S.shuffleInfo.cuts}×`));
   }
 
   const last = $('last');
