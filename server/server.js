@@ -159,9 +159,15 @@ class Room {
     this.swaps = this.swaps.filter((r) => r.from !== token && r.to !== token);
   }
 
-  notifyToken(token, msg) {
+  // Notices carry a code and a name so each player can read them in their own language; `msg` is the English text.
+  notifyToken(token, code, name) {
+    const text = {
+      swapAsk: `${name} would like to swap seats with you`,
+      swapDone: `${name} swapped seats with you`,
+      swapNo: `${name} would rather stay where they are`,
+    }[code];
     const i = this.findToken(token);
-    if (i >= 0 && this.isConnected(i)) send(this.seats[i].human.ws, { t: 'notice', msg });
+    if (i >= 0 && this.isConnected(i)) send(this.seats[i].human.ws, { t: 'notice', code, name, msg: text });
   }
 
   swapRequest(seat, target) {
@@ -172,7 +178,7 @@ class Room {
     const me = this.seats[seat].human;
     this.swaps = this.swaps.filter((r) => r.from !== me.token); // one open request at a time
     this.swaps.push({ from: me.token, to: other.token, at: Date.now() });
-    this.notifyToken(other.token, `${me.name} would like to swap seats with you`);
+    this.notifyToken(other.token, 'swapAsk', me.name);
   }
 
   swapCancel(seat) {
@@ -187,12 +193,12 @@ class Room {
     const req = asker && this.swaps.find((r) => r.to === me.token && r.from === asker.token && Date.now() - r.at < 90000);
     if (!req) throw new GameError('that request is no longer open');
     this.swaps = this.swaps.filter((r) => r !== req);
-    if (!accept) return this.notifyToken(asker.token, `${me.name} would rather stay where they are`);
+    if (!accept) return this.notifyToken(asker.token, 'swapNo', me.name);
     this.seats[seat].human = asker;
     this.seats[fromSeat].human = me;
     this.dropSwaps(me.token);
     this.dropSwaps(asker.token);
-    this.notifyToken(asker.token, `${me.name} swapped seats with you`);
+    this.notifyToken(asker.token, 'swapDone', me.name);
   }
 
   detach(ws) {

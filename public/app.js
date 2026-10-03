@@ -2,20 +2,23 @@
 // Ghafoon browser client. The server is authoritative; this renders the last state it sent.
 
 const SUITS = ['♠', '♥', '♣', '♦'];
-const SUIT_NAMES = ['Spades', 'Hearts', 'Clubs', 'Diamonds'];
 const isRed = (s) => s === 1 || s === 3;
 const suitOf = (c) => (c / 13) | 0;
 const rankOf = (c) => (c % 13) + 2;
-const RANK_LABEL = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' };
-const rankLabel = (r) => RANK_LABEL[r] || String(r);
-const POS = ['p0', 'p1', 'p2', 'p3'];
-const CONTRACT_INFO = {
-  hokm: { label: 'Hokm', rule: 'Trump suit: name one suit as Hokm.' },
-  saras: { label: 'Saras', rule: 'No trump. The highest card of the led suit wins.' },
-  naras: { label: 'Naras', rule: 'No trump. The lowest card of the led suit wins (Ace is high, so it loses).' },
-  taknaras: { label: 'Tak-Naras', rule: 'No trump. The lowest card wins and the Ace counts as 1, so the Ace wins.' },
-};
-const SHORT_RULE = { saras: 'highest wins', naras: 'lowest wins', taknaras: 'lowest wins, Ace = 1' }; // relative to me: bottom, left, top, right
+const rankLabel = (r) => I18N.rankLabel(r);
+const POS = ['p0', 'p1', 'p2', 'p3']; // relative to me: bottom, left, top, right
+
+// ---- language (the texts live in i18n.js; Persian is the default, English the alternative)
+I18N.init();
+const { t, num } = I18N;
+const iso = (x) => (I18N.isFa() ? `\u2068${x}\u2069` : String(x)); // isolates names so Latin letters cannot scramble a Persian sentence
+const dispName = (s) => (s.kind === 'bot' ? I18N.botName(s.name) : s.name);
+const cLabel = (k) => t('c.' + k);
+const cRule = (k) => t('c.' + k + '.rule');
+const cShort = (k) => t('c.' + k + '.short');
+const lab = (n) => I18N.numLabel(n);
+const rdLabel = (n, raised) => I18N.readingLabel(n, raised);
+const suitName = (s) => I18N.suitName(s);
 
 const $ = (id) => document.getElementById(id);
 
@@ -66,7 +69,7 @@ function myName() {
 function requireName() {
   const n = myName();
   if (!n) {
-    $('home-msg').textContent = 'Pick a name first';
+    $('home-msg').textContent = t('home.needName');
     $('name').focus();
   }
   return n;
@@ -86,7 +89,7 @@ function connect(then) {
     if (session) {
       retry++;
       setTimeout(() => connect(), Math.min(5000, 400 * retry));
-      if (S) toast('Connection lost, reconnecting…');
+      if (S) toast(t('conn.lost'));
     }
   };
 }
@@ -105,8 +108,8 @@ function onMessage(m) {
       S = null;
       history.replaceState(null, '', location.pathname);
       render();
-      $('home-msg').textContent = m.msg;
-    } else toast(m.msg);
+      $('home-msg').textContent = I18N.errorText(m.msg);
+    } else toast(I18N.errorText(m.msg));
   } else if (m.t === 'chatLog') {
     chatMsgs = m.msgs.slice();
     chatUnread = 0;
@@ -114,7 +117,7 @@ function onMessage(m) {
   } else if (m.t === 'chat') {
     onChat(m.msg);
   } else if (m.t === 'notice') {
-    toast(m.msg, true);
+    toast(I18N.NOTICE_KEYS[m.code] ? t(I18N.NOTICE_KEYS[m.code], { name: iso(m.name) }) : m.msg, true);
   } else if (m.t === 'left') {
     chatMsgs = []; chatUnread = 0; setChatOpen(false);
     save(null);
@@ -125,12 +128,12 @@ function onMessage(m) {
 }
 
 function toast(msg, info) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.toggle('notice', !!info);
-  t.classList.remove('hidden');
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('notice', !!info);
+  el.classList.remove('hidden');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.add('hidden'), 2600);
+  toast.t = setTimeout(() => el.classList.add('hidden'), 2600);
 }
 
 // ------------------------------------------------------------- home / lobby actions
@@ -142,7 +145,7 @@ $('btn-join').onclick = () => {
   const name = requireName();
   if (!name) return;
   const room = $('code').value.trim().toUpperCase();
-  if (room.length !== 4) { $('home-msg').textContent = 'Enter the 4-letter room code'; return; }
+  if (room.length !== 4) { $('home-msg').textContent = t('home.needCode'); return; }
   connect(() => send({ t: 'join', room, name }));
 };
 $('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-create').click(); });
@@ -158,12 +161,12 @@ $('btn-copy').onclick = () => {
   const el = $('share-link');
   el.select();
   (navigator.clipboard ? navigator.clipboard.writeText(el.value) : Promise.reject()).catch(() => document.execCommand('copy'));
-  toast('Link copied');
+  toast(t('lobby.copied'));
 };
 $('btn-start').onclick = () => send({ t: 'start' });
 const leave = () => send({ t: 'leave' });
 $('btn-leave-lobby').onclick = leave;
-$('btn-leave').onclick = () => { if (confirm('Leave the game? A bot will take your seat.')) leave(); };
+$('btn-leave').onclick = () => { if (confirm(t('game.leaveConfirm'))) leave(); };
 
 // ------------------------------------------------------------- rendering
 
@@ -190,63 +193,62 @@ function renderLobby() {
   const nameBox = $('lobby-name');
   if (document.activeElement !== nameBox) nameBox.value = S.seats[S.you].name;
 
-  // Four fixed slots, the same for everybody: seat 1 bottom, 2 left, 3 top, 4 right.
-  // Partners sit opposite each other (1 + 3 = Team A, 2 + 4 = Team B). The game screen turns the table so that
-  // you are at the bottom, but the lobby never moves.
+  // Four fixed slots, the same for everybody: bottom A, top B (partners), left C, right D (partners).
+  // The game screen turns the table so that you are at the bottom, but the lobby never moves.
   const seatEls = S.seats.map((s, i) => {
     const me = i === S.you;
     const team = i % 2 === 0 ? 'ta' : 'tb';
-    const teamName = i % 2 === 0 ? 'Team A' : 'Team B';
     const empty = s.kind === 'empty';
     const asksMe = S.swapIn.includes(i);
     const iAsked = S.swapOut === i;
     const kids = [
-      h('div', { class: 'role' }, `Seat ${i + 1} · ${teamName}${i === S.host ? ' · Host' : ''}`),
-      h('div', { class: 'nm' }, empty ? 'Empty' : s.name),
+      h('div', { class: 'role' }, t('lobby.seatLine', { seat: iso(I18N.seatLetter(i)), team: iso(I18N.teamLabel(i)) }) + (i === S.host ? t('lobby.hostTag') : '')),
+      h('div', { class: 'nm' }, empty ? t('lobby.empty') : dispName(s)),
     ];
-    if (empty) kids.push(h('div', { class: 'sub' }, 'A bot plays here. Click to sit'));
-    else if (me) kids.push(h('div', { class: 'sub you' }, 'This is you'));
+    if (empty) kids.push(h('div', { class: 'sub' }, t('lobby.botHere')));
+    else if (me) kids.push(h('div', { class: 'sub you' }, t('lobby.you')));
     else if (asksMe) {
-      kids.push(h('div', { class: 'sub ask' }, 'wants to swap with you'),
+      kids.push(h('div', { class: 'sub ask' }, t('lobby.wantsSwap')),
         h('div', { class: 'swap-row' },
-          h('button', { class: 'small yes', onclick: (e) => { e.stopPropagation(); send({ t: 'swapReply', seat: i, accept: true }); } }, 'Accept'),
-          h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swapReply', seat: i, accept: false }); } }, 'Decline')));
+          h('button', { class: 'small yes', onclick: (e) => { e.stopPropagation(); send({ t: 'swapReply', seat: i, accept: true }); } }, t('lobby.accept')),
+          h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swapReply', seat: i, accept: false }); } }, t('lobby.decline'))));
     } else if (iAsked) {
-      kids.push(h('div', { class: 'sub' }, 'Waiting for their answer…'),
-        h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swapCancel' }); } }, 'Cancel'));
+      kids.push(h('div', { class: 'sub' }, t('lobby.waitAnswer')),
+        h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swapCancel' }); } }, t('lobby.cancel')));
     } else {
-      kids.push(h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swap', seat: i }); } }, 'Ask to swap'));
+      kids.push(h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swap', seat: i }); } }, t('lobby.askSwap')));
     }
     return h('div', {
-      class: `lseat p${i === 0 ? 0 : i === 1 ? 1 : i === 2 ? 2 : 3} ${team} ${empty ? 'empty' : ''} ${me ? 'me' : ''} ${asksMe ? 'asks' : ''}`,
+      class: `lseat p${i} ${team} ${empty ? 'empty' : ''} ${me ? 'me' : ''} ${asksMe ? 'asks' : ''}`,
       role: empty ? 'button' : null,
       tabindex: empty ? '0' : null,
       onclick: empty ? () => send({ t: 'sit', seat: i }) : null,
       onkeydown: empty ? (e) => { if (e.key === 'Enter' || e.key === ' ') send({ t: 'sit', seat: i }); } : null,
     }, kids);
   });
-  const nm = (i) => (S.seats[i].kind === 'empty' ? 'bot' : S.seats[i].name);
+  const nmL = (i) => iso(S.seats[i].kind === 'empty' ? t('word.bot') : dispName(S.seats[i]));
   const mid = h('div', { class: 'lmid' },
-    h('div', { class: 'vsline ta' }, `${nm(0)} + ${nm(2)}`),
-    h('div', { class: 'vs' }, 'vs'),
-    h('div', { class: 'vsline tb' }, `${nm(1)} + ${nm(3)}`));
+    h('div', { class: 'vsline ta' }, `${nmL(0)} + ${nmL(2)}`),
+    h('div', { class: 'vs' }, t('lobby.vsWord')),
+    h('div', { class: 'vsline tb' }, `${nmL(1)} + ${nmL(3)}`));
   $('lobby-seats').replaceChildren(...seatEls, mid);
 
   const host = S.host === S.you;
   $('btn-start').disabled = !host;
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   $('lobby-msg').textContent = local
-    ? `You are on ${location.host}, so this link only works on your own PC. Friends can open your public address instead and type the code ${S.room}.`
-    : host ? 'You are the host: press Start game when everyone is seated.' : `Waiting for ${S.seats[S.host] ? S.seats[S.host].name : 'the host'} (the host) to start…`;
+    ? t('lobby.localWarn', { host: iso(location.host), code: iso(S.room) })
+    : host ? t('lobby.youHost') : t('lobby.waitHost', { name: iso(S.seats[S.host] ? dispName(S.seats[S.host]) : t('lobby.theHost')) });
 }
 
-const nameOf = (i) => S.seats[i].name;
-const teamClass = (i) => (i % 2 === S.you % 2 ? 'us' : 'them');
+const nameOf = (i) => dispName(S.seats[i]);
+const nm = (i) => iso(nameOf(i)); // for use inside a sentence
 
 function cardEl(c, cls = '') {
   const s = suitOf(c);
+  const face = rankLabel(rankOf(c));
   return h('div', { class: `card ${isRed(s) ? 'red' : ''} ${cls}`, 'data-c': c },
-    h('div', { class: 'corner' }, h('span', { class: 'r' }, rankLabel(rankOf(c))), h('span', { class: 's' }, SUITS[s])),
+    h('div', { class: 'corner' }, h('span', { class: `r${face.length > 2 ? ' long' : ''}` }, face), h('span', { class: 's' }, SUITS[s])),
     h('span', { class: 'pip' }, SUITS[s]));
 }
 
@@ -275,15 +277,14 @@ function showHokmBanner() {
   const b = $('banner');
   if (S.contract === 'hokm') {
     b.replaceChildren(
-      h('span', { class: 'w' }, 'Hokm'),
+      h('span', { class: 'w' }, t('ban.hokm')),
       h('span', { class: `s ${isRed(S.hokm) ? 'red' : ''}` }, SUITS[S.hokm]),
-      h('div', { class: 'by' }, `${nameOf(S.hakem)} named ${SUIT_NAMES[S.hokm]}`));
+      h('div', { class: 'by' }, t('ban.named', { name: nm(S.hakem), suit: suitName(S.hokm) })));
   } else {
-    const c = CONTRACT_INFO[S.contract];
     b.replaceChildren(
-      h('span', { class: 'w' }, c.label),
-      h('div', { class: 'rule' }, c.rule),
-      h('div', { class: 'by' }, `${nameOf(S.hakem)} plays Sheet`));
+      h('span', { class: 'w' }, cLabel(S.contract)),
+      h('div', { class: 'rule' }, cRule(S.contract)),
+      h('div', { class: 'by' }, t('ban.sheetBy', { name: nm(S.hakem) })));
   }
   b.classList.remove('raise');
   b.classList.toggle('long', S.contract !== 'hokm');
@@ -298,17 +299,16 @@ function showRaiseBanner(kind) {
   const b = $('banner');
   const r = S.raise || S.lastRaise;
   if (!r) return;
-  const label = (n) => (n === 13 ? 'ALL' : String(n));
   if (kind === 'declared') {
     b.replaceChildren(
-      h('span', { class: 'w' }, 'Raise!'),
-      h('div', { class: 'big-num' }, `${label(r.from)} → ${label(r.to)}`),
-      h('div', { class: 'by' }, `${nameOf(S.hakem)} raises the reading`));
+      h('span', { class: 'w' }, t('ban.raise')),
+      h('div', { class: 'big-num' }, `${lab(r.from)} → ${lab(r.to)}`),
+      h('div', { class: 'by' }, t('ban.raises', { name: nm(S.hakem) })));
   } else {
     b.replaceChildren(
-      h('span', { class: 'w' }, 'Raise accepted'),
-      h('div', { class: 'big-num' }, `${label(r.to)}`),
-      h('div', { class: 'by' }, `${nameOf(S.hakem)} now needs ${label(r.to)} tricks`));
+      h('span', { class: 'w' }, t('ban.raiseOk')),
+      h('div', { class: 'big-num' }, lab(r.to)),
+      h('div', { class: 'by' }, t('ban.needs', { name: nm(S.hakem), n: r.to })));
   }
   b.classList.add('long', 'raise');
   b.classList.add('hidden');
@@ -323,9 +323,9 @@ function renderScore() {
   const mine = S.scores[my];
   const theirs = S.scores[1 - my];
   $('scoreboard').replaceChildren(
-    h('div', { class: 'team us' }, h('span', { class: 'lab' }, 'Us'), h('span', { class: 'big' }, mine)),
-    h('div', { class: 'goal' }, 'to 104'),
-    h('div', { class: 'team them' }, h('span', { class: 'lab' }, 'Them'), h('span', { class: 'big' }, theirs)),
+    h('div', { class: 'team us' }, h('span', { class: 'lab' }, t('score.us')), h('span', { class: 'big' }, num(mine))),
+    h('div', { class: 'goal' }, t('score.to', { n: 104 })),
+    h('div', { class: 'team them' }, h('span', { class: 'lab' }, t('score.them')), h('span', { class: 'big' }, num(theirs))),
   );
 }
 
@@ -334,7 +334,7 @@ const CROWN = () => {
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 34 26');
   svg.setAttribute('class', 'crown');
-  svg.setAttribute('aria-label', 'Hakem');
+  svg.setAttribute('aria-label', t('crown.title'));
   const path = document.createElementNS(ns, 'path');
   path.setAttribute('d', 'M3 21 L1.5 6 L10 13 L17 2 L24 13 L32.5 6 L31 21 Z');
   path.setAttribute('fill', '#f2c94c');
@@ -352,10 +352,10 @@ function seatPlate(i) {
   const rel = (i - S.you + 4) % 4;
   const info = S.seats[i];
   const badges = [];
-  if (i === S.sardast) badges.push(h('span', { class: 'badge sardast' }, 'Sardast'));
-  if (i === S.dealer) badges.push(h('span', { class: 'badge dealer' }, 'Dealer'));
-  if (info.kind === 'bot') badges.push(h('span', { class: 'badge bot' }, 'Bot'));
-  if (info.kind === 'away') badges.push(h('span', { class: 'badge bot' }, 'Away, bot'));
+  if (i === S.sardast) badges.push(h('span', { class: 'badge sardast' }, t('badge.sardast')));
+  if (i === S.dealer) badges.push(h('span', { class: 'badge dealer' }, t('badge.dealer')));
+  if (info.kind === 'bot') badges.push(h('span', { class: 'badge bot' }, t('badge.bot')));
+  if (info.kind === 'away') badges.push(h('span', { class: 'badge bot' }, t('badge.away')));
 
   // big, bold reading above the bubble while reading; afterwards only the Hakem keeps theirs, with a crown
   const hakemKnown = S.hakem != null && S.phase !== 'reading' && S.phase !== 'draw';
@@ -363,23 +363,22 @@ function seatPlate(i) {
   if (S.phase === 'reading' || S.phase === 'draw') {
     const b = S.bids[i];
     if (b == null) { if (S.turn === i && S.phase === 'reading') chip = h('div', { class: 'chip wait' }, '…'); }
-    else if (b === 0) chip = h('div', { class: 'chip pass' }, 'PASS');
-    else if (b === 13) chip = h('div', { class: 'chip sheet' }, 'SHEET');
-    else chip = h('div', { class: 'chip' }, b);
+    else if (b === 0) chip = h('div', { class: 'chip pass' }, t('chip.pass'));
+    else if (b === 13) chip = h('div', { class: 'chip sheet' }, t('chip.sheet'));
+    else chip = h('div', { class: 'chip' }, num(b));
   } else if (hakemKnown && i === S.hakem) {
-    chip = S.reading === 13 ? h('div', { class: 'chip sheet' }, 'SHEET') : h('div', { class: 'chip' }, S.reading);
+    chip = S.reading === 13 ? h('div', { class: 'chip sheet' }, t('chip.sheet')) : h('div', { class: 'chip' }, num(S.reading));
   }
   if (S.phase === 'raiseVote' && S.raise) {
-    const lab = (n) => (n === 13 ? 'ALL' : String(n));
     if (i === S.hakem) chip = h('div', { class: 'chip raise' }, `${lab(S.raise.from)} → ${lab(S.raise.to)}`);
-    else if (S.raise.votes[i] === true) chip = h('div', { class: 'chip yes' }, 'YES');
-    else if (S.raise.votes[i] === false) chip = h('div', { class: 'chip no' }, 'NO');
+    else if (S.raise.votes[i] === true) chip = h('div', { class: 'chip yes' }, t('chip.yes'));
+    else if (S.raise.votes[i] === false) chip = h('div', { class: 'chip no' }, t('chip.no'));
     else if (i % 2 !== S.hakem % 2) chip = h('div', { class: 'chip wait' }, '…');
   }
   const crown = hakemKnown && i === S.hakem ? CROWN() : null;
   const plus = i === S.you && S.canRaise
     ? h('button', {
-      class: `plus-btn ${raiseOpen ? 'on' : ''}`, title: 'Raise your reading', 'aria-label': 'Raise your reading',
+      class: `plus-btn ${raiseOpen ? 'on' : ''}`, title: t('raise.plus'), 'aria-label': t('raise.plus'),
       onclick: () => { raiseOpen = !raiseOpen; renderActions(); renderTable(); },
     }, raiseOpen ? '×' : '+')
     : null;
@@ -388,12 +387,12 @@ function seatPlate(i) {
   const backs = rel === 0 ? null : h('div', { class: 'backs' }, Array.from({ length: Math.min(S.counts[i], 16) }, () => h('div', { class: 'back' })));
   return h('div', { class: `seat ${POS[rel]}` },
     backs,
-    h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}`, title: crown ? 'Hakem' : null },
+    h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}`, title: crown ? t('crown.title') : null },
       crown || chip || plus ? h('div', { class: 'over' }, crown, chip, plus) : null,
       bubbles[i] && bubbles[i].until > Date.now() ? h('div', { class: 'say' }, bubbles[i].text) : null,
-      h('div', { class: 'nm' }, info.name + (i === S.you ? ' (you)' : '')),
+      h('div', { class: 'nm' }, dispName(info) + (i === S.you ? t('plate.you') : '')),
       h('div', { class: 'badges' }, badges),
-      rel === 0 ? null : h('div', { class: 'cnt' }, `${S.counts[i]} cards`),
+      rel === 0 ? null : h('div', { class: 'cnt' }, t('plate.cards', { n: S.counts[i] })),
     ),
   );
 }
@@ -423,12 +422,12 @@ function renderTable() {
   info.replaceChildren();
   if (S.contract === 'hokm') {
     info.append(h('div', { class: 'hokm-box' },
-      h('div', { class: 'lab' }, 'Hokm'),
-      h('div', { class: `big ${isRed(S.hokm) ? 'red' : ''}` }, `${SUITS[S.hokm]} ${SUIT_NAMES[S.hokm]}`)));
+      h('div', { class: 'lab' }, t('info.hokm')),
+      h('div', { class: `big ${isRed(S.hokm) ? 'red' : ''}` }, `${SUITS[S.hokm]} ${suitName(S.hokm)}`)));
   } else if (S.contract) {
-    info.append(h('div', { class: 'hokm-box', title: CONTRACT_INFO[S.contract].rule },
-      h('div', { class: 'lab' }, SHORT_RULE[S.contract]),
-      h('div', { class: 'big' }, CONTRACT_INFO[S.contract].label)));
+    info.append(h('div', { class: 'hokm-box', title: cRule(S.contract) },
+      h('div', { class: 'lab' }, cShort(S.contract)),
+      h('div', { class: 'big' }, cLabel(S.contract))));
   }
   if (S.hakem != null && S.reading && S.phase !== 'reading' && S.phase !== 'draw') {
     const hteam = S.hakem % 2;
@@ -437,19 +436,20 @@ function renderTable() {
     const mineIsHakem = hteam === S.you % 2;
     const hk = mineIsHakem ? 'us' : 'them';
     const ok = mineIsHakem ? 'them' : 'us';
-    info.append(h('div', { class: 'tricks-box', title: 'The bag counts as a trick for the hakem team' },
-      h('div', {}, `${nameOf(S.hakem)} reads ${need === 13 ? (S.originalReading != null ? 'ALL' : 'Sheet') : need}${S.originalReading != null ? ` (raised from ${S.originalReading})` : ''}`),
-      h('div', { class: hk }, `${mineIsHakem ? 'Us' : 'Them'} (hakem): ${S.tricks[hteam]} / ${need}`),
-      h('div', { class: ok }, `${mineIsHakem ? 'Them' : 'Us'} (bust): ${S.tricks[1 - hteam]} / ${bust}`),
+    const who = (mine) => t(mine ? 'score.us' : 'score.them');
+    info.append(h('div', { class: 'tricks-box', title: t('info.bagTitle') },
+      h('div', {}, t('info.reads', { name: nm(S.hakem), r: rdLabel(need, S.originalReading != null) }) + (S.originalReading != null ? t('info.raisedFrom', { n: S.originalReading }) : '')),
+      h('div', { class: hk }, t('info.hakemLine', { who: who(mineIsHakem), a: S.tricks[hteam], n: need })),
+      h('div', { class: ok }, t('info.bustLine', { who: who(!mineIsHakem), a: S.tricks[1 - hteam], n: bust })),
     ));
   } else if (S.round > 1 && S.shuffleInfo && S.shuffleInfo.kind === 'stacked' && S.phase === 'reading') {
-    info.append(h('div', { class: 'tricks-box' }, `Stacks kept, cut ${S.shuffleInfo.cuts}×`));
+    info.append(h('div', { class: 'tricks-box' }, t('info.shuffle', { n: S.shuffleInfo.cuts })));
   }
 
   const last = $('last');
   last.replaceChildren();
   if (S.lastTrick && S.phase === 'play') {
-    last.append('Last trick', h('div', { class: 'cards' }, S.lastTrick.plays.map((p) => cardEl(p.card, `tiny ${p.seat === S.lastTrick.winner ? 'win' : ''}`))));
+    last.append(t('info.last'), h('div', { class: 'cards' }, S.lastTrick.plays.map((p) => cardEl(p.card, `tiny ${p.seat === S.lastTrick.winner ? 'win' : ''}`))));
   }
 }
 
@@ -478,37 +478,36 @@ function renderStatus() {
   switch (S.phase) {
     case 'draw':
       msg = drawAnim && S.draw && drawAnim.round === S.round && drawAnim.done
-        ? `${nameOf(S.draw.seat)} gets the first Ace and reads first`
-        : 'Drawing for the first Ace…';
+        ? t('st.drawDone', { name: nm(S.draw.seat) })
+        : t('st.draw');
       break;
-    case 'reading': msg = S.turn === me ? 'Your turn to read' : `${nameOf(S.turn)} is reading…`; break;
+    case 'reading': msg = S.turn === me ? t('st.myRead') : t('st.theyRead', { name: nm(S.turn) }); break;
     case 'hakem':
       msg = S.hakem === me
-        ? `You are the Hakem with ${S.reading === 13 ? 'Sheet' : S.reading}${S.forced ? ' (forced 7)' : ''}: pick 4 cards for the bag, then press Discard`
-        : `${nameOf(S.hakem)} is picking the bag…`;
+        ? t('st.hakemMe', { r: rdLabel(S.reading), forced: S.forced ? t('st.forced') : '' })
+        : t('st.hakemOther', { name: nm(S.hakem) });
       break;
     case 'hokm':
       msg = S.hakem === me
-        ? (S.reading === 13 ? 'Sheet! Choose how to play: Hokm, Naras, Saras or Tak-Naras' : 'Now pick the Hokm suit and press Hokm')
-        : (S.reading === 13 ? `${nameOf(S.hakem)} is choosing: Hokm, Naras, Saras or Tak-Naras…` : `${nameOf(S.hakem)} is choosing Hokm…`);
+        ? t(S.reading === 13 ? 'st.hokmMeSheet' : 'st.hokmMe')
+        : t(S.reading === 13 ? 'st.hokmOtherSheet' : 'st.hokmOther', { name: nm(S.hakem) });
       break;
     case 'play':
-      if (S.contract && S.contract !== 'hokm') msg0 = `${CONTRACT_INFO[S.contract].label}: ${SHORT_RULE[S.contract]}. `;
+      if (S.contract && S.contract !== 'hokm') msg0 = t('st.contractLine', { label: cLabel(S.contract), rule: cShort(S.contract) });
       if (S.turn === me) {
-        msg = S.plays.length ? `Your turn: follow ${SUIT_NAMES[suitOf(S.plays[0].card)]} if you can` : 'Your lead: play any card';
-        if (COARSE) msg += armed != null ? ' (tap again to play)' : ' (tap a card twice)';
-      } else msg = `${nameOf(S.turn)} to play`;
+        msg = S.plays.length ? t('st.follow', { suit: suitName(suitOf(S.plays[0].card)) }) : t('st.lead');
+        if (COARSE) msg += armed != null ? t('st.tapAgain') : t('st.tapTwice');
+      } else msg = t('st.theirTurn', { name: nm(S.turn) });
       break;
     case 'raiseVote': {
       const r = S.raise;
-      const lab = (n) => (n === 13 ? 'ALL' : n);
-      if (S.canVote) msg = `${nameOf(S.hakem)} wants to raise ${lab(r.from)} → ${lab(r.to)}. Answer YES or NO`;
-      else if (me === S.hakem) msg = 'Waiting for the opponents to answer your raise…';
-      else if (me % 2 !== S.hakem % 2) msg = r.votes[me] === false ? 'You said NO. Waiting for your partner…' : 'Waiting…';
-      else msg = `${nameOf(S.hakem)} raised ${lab(r.from)} → ${lab(r.to)}. The opponents are answering…`;
+      if (S.canVote) msg = t('st.voteMe', { name: nm(S.hakem), a: lab(r.from), b: lab(r.to) });
+      else if (me === S.hakem) msg = t('st.voteHakem');
+      else if (me % 2 !== S.hakem % 2) msg = r.votes[me] === false ? t('st.voteSaidNo') : t('st.voteWait');
+      else msg = t('st.votePartner', { name: nm(S.hakem), a: lab(r.from), b: lab(r.to) });
       break;
     }
-    case 'trickEnd': msg = `${nameOf(S.trickWinner)} takes the trick`; break;
+    case 'trickEnd': msg = t('st.trick', { name: nm(S.trickWinner) }); break;
     default: msg = '';
   }
   $('status').textContent = msg0 + msg;
@@ -517,50 +516,48 @@ function renderStatus() {
 function renderActions() {
   const box = $('actions');
   box.replaceChildren();
-  const lab = (n) => (n === 13 ? 'ALL' : String(n));
   if (S.phase === 'raiseVote' && S.canVote) {
     const r = S.raise;
     box.append(
       h('div', { class: 'group' },
-        h('button', { class: 'votebtn yes', onclick: () => send({ t: 'vote', yes: true }) }, 'YES'),
-        h('button', { class: 'votebtn no', onclick: () => send({ t: 'vote', yes: false }) }, 'NO')),
+        h('button', { class: 'votebtn yes', onclick: () => send({ t: 'vote', yes: true }) }, t('raise.yes')),
+        h('button', { class: 'votebtn no', onclick: () => send({ t: 'vote', yes: false }) }, t('raise.no'))),
       h('div', { class: 'hint' },
-        `YES: they must now take ${lab(r.to)} and you only need ${14 - r.to} trick${14 - r.to === 1 ? '' : 's'} to bust them (it was ${14 - r.from}). `
-        + `NO from both of you ends the round: ${nameOf(S.hakem)}'s team wins ${lab(r.from)}.`));
+        t('raise.yesHint', { to: r.to, need: 14 - r.to, tricks: t(14 - r.to === 1 ? 'unit.trick' : 'unit.tricks'), was: 14 - r.from, name: nm(S.hakem), from: r.from })));
     return;
   }
   if (raiseOpen && S.canRaise) {
-    const g = h('div', { class: 'group' }, h('span', { class: 'lab raise-lab' }, 'RAISE TO:'));
+    const g = h('div', { class: 'group' }, h('span', { class: 'lab raise-lab' }, t('raise.to')));
     for (const n of S.raiseOptions) {
       g.append(h('button', {
         class: `raisebtn ${n === 13 ? 'all' : ''}`,
         onclick: () => { raiseOpen = false; send({ t: 'raise', to: n }); },
       }, lab(n)));
     }
-    g.append(h('button', { class: 'small', onclick: () => { raiseOpen = false; renderActions(); renderTable(); } }, 'Cancel'));
+    g.append(h('button', { class: 'small', onclick: () => { raiseOpen = false; renderActions(); renderTable(); } }, t('raise.cancel')));
     box.append(g, h('div', { class: 'hint' },
-      `The opponents answer YES or NO. One YES and your reading goes up. If both say NO you win your current ${lab(S.reading)} at once. You can raise only once.`));
+      t('raise.hint', { r: S.reading })));
     return;
   }
   if (S.phase === 'reading' && S.turn === S.you) {
-    const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, 'Read:'));
-    for (let v = 7; v <= 12; v++) g.append(h('button', { class: 'bidbtn', disabled: v <= S.highest, onclick: () => send({ t: 'bid', value: v }) }, v));
-    g.append(h('button', { class: 'bidbtn', disabled: 13 <= S.highest, onclick: () => send({ t: 'bid', value: 13 }) }, 'Sheet'));
-    g.append(h('button', { class: 'bidbtn', onclick: () => send({ t: 'bid', value: 0 }) }, 'Pass'));
+    const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, t('act.read')));
+    for (let v = 7; v <= 12; v++) g.append(h('button', { class: 'bidbtn', disabled: v <= S.highest, onclick: () => send({ t: 'bid', value: v }) }, num(v)));
+    g.append(h('button', { class: 'bidbtn', disabled: 13 <= S.highest, onclick: () => send({ t: 'bid', value: 13 }) }, t('act.sheet')));
+    g.append(h('button', { class: 'bidbtn', onclick: () => send({ t: 'bid', value: 0 }) }, t('act.pass')));
     box.append(g);
   } else if (S.phase === 'hakem' && S.hakem === S.you) {
     box.append(h('div', { class: 'group' },
-      h('span', { class: 'lab' }, `Bag: ${selected.size} / 4 cards`),
-      h('button', { class: 'primary', disabled: selected.size !== 4, onclick: () => send({ t: 'discard', discards: [...selected] }) }, 'Discard')));
+      h('span', { class: 'lab' }, t('act.bag', { n: selected.size })),
+      h('button', { class: 'primary', disabled: selected.size !== 4, onclick: () => send({ t: 'discard', discards: [...selected] }) }, t('act.discard'))));
   } else if (S.phase === 'hokm' && S.hakem === S.you) {
     const sheet = S.reading === 13;
     if (!sheet) pickedContract = 'hokm';
     const suitRow = () => {
-      const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, 'Hokm suit:'));
+      const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, t('act.hokmSuit')));
       for (let s = 0; s < 4; s++) {
         g.append(h('button', {
           class: `suitbtn ${isRed(s) ? 'red' : ''} ${pickedHokm === s ? 'on' : ''}`,
-          title: SUIT_NAMES[s],
+          title: suitName(s),
           onclick: () => { pickedHokm = s; renderActions(); },
         }, SUITS[s]));
       }
@@ -572,19 +569,19 @@ function renderActions() {
         g.append(h('button', {
           class: `cbtn ${pickedContract === key ? 'on' : ''}`,
           onclick: () => { pickedContract = key; renderActions(); },
-        }, CONTRACT_INFO[key].label));
+        }, cLabel(key)));
       }
       box.append(g);
     }
     if (pickedContract === 'hokm') box.append(suitRow());
     const ready = pickedContract != null && (pickedContract !== 'hokm' || pickedHokm != null);
-    const label = pickedContract ? CONTRACT_INFO[pickedContract].label : 'Choose';
+    const label = pickedContract ? cLabel(pickedContract) : t('act.choose');
     const go = h('button', {
       class: 'primary', disabled: !ready,
       onclick: () => send({ t: 'contract', contract: pickedContract, hokm: pickedContract === 'hokm' ? pickedHokm : undefined }),
-    }, sheet ? `Play ${label}` : 'Hokm');
+    }, sheet ? t('act.play', { label }) : t('act.hokmBtn'));
     box.append(go);
-    if (sheet && pickedContract) box.append(h('div', { class: 'hint' }, CONTRACT_INFO[pickedContract].rule));
+    if (sheet && pickedContract) box.append(h('div', { class: 'hint' }, cRule(pickedContract)));
   }
 }
 
@@ -671,34 +668,34 @@ function renderOverlay() {
   const my = S.you % 2;
   const usScored = r.scoringTeam === my;
   const hakemUs = r.hakemTeam === my;
-  const reading = r.reading === 13 ? 'Sheet' : r.reading;
-  const raisedNote = r.raisedFrom != null ? ` (raised from ${r.raisedFrom})` : '';
+  const raised = r.raisedFrom != null;
+  const note = raised ? t('end.raisedNote', { n: r.raisedFrom }) : '';
   const headline = r.raiseRefused
-    ? `${hakemUs ? 'Your opponents' : 'Your team'} refused the raise to ${r.refusedTo === 13 ? 'ALL' : r.refusedTo}: ${hakemUs ? 'your team wins' : 'Opponents win'} ${reading}`
+    ? t(hakemUs ? 'end.refusedUs' : 'end.refusedThem', { to: lab(r.refusedTo), r: r.reading })
     : r.outcome === 'made'
-      ? `${hakemUs ? 'Your team' : 'Opponents'} made ${reading}${raisedNote}`
-      : `${hakemUs ? 'Your team was busted' : 'Opponents busted'} on ${reading}${raisedNote}`;
+      ? t(hakemUs ? 'end.madeUs' : 'end.madeThem', { r: I18N.readingPoss(r.reading, raised), note })
+      : t(hakemUs ? 'end.bustUs' : 'end.bustThem', { r: rdLabel(r.reading, raised), note });
   const modal = h('div', { class: 'modal' });
   if (S.phase === 'gameOver') {
     const won = S.winner === my;
-    modal.append(h('div', { class: 'big' }, won ? '🏆 You win!' : 'You lose'),
-      h('div', { class: 'sub' }, won ? 'Your team reached 104 first.' : 'The opponents reached 104 first.'));
-  } else modal.append(h('h2', {}, `Round ${S.round}`));
+    modal.append(h('div', { class: 'big' }, t(won ? 'end.win' : 'end.lose')),
+      h('div', { class: 'sub' }, t(won ? 'end.won104' : 'end.lost104')));
+  } else modal.append(h('h2', {}, t('end.round', { n: S.round })));
   modal.append(
-    h('div', {}, headline, ` (${nameOf(r.hakem)} was Hakem)`),
-    h('div', { class: 'sub' }, `Tricks: us ${r.tricks[my]}, them ${r.tricks[1 - my]} (bag included)`),
+    h('div', {}, headline, ' ', t('end.hakemWas', { name: nm(r.hakem) })),
+    h('div', { class: 'sub' }, t('end.tricks', { a: r.tricks[my], b: r.tricks[1 - my] })),
     h('div', { class: 'vs' },
-      h('div', { class: 'us' }, h('div', { class: 'sub' }, 'Us'), h('div', { class: 'n' }, S.scores[my]), usScored ? h('div', { class: 'plus' }, `+${r.points}`) : null),
-      h('div', { class: 'them' }, h('div', { class: 'sub' }, 'Them'), h('div', { class: 'n' }, S.scores[1 - my]), !usScored ? h('div', { class: 'plus' }, `+${r.points}`) : null)),
+      h('div', { class: 'us' }, h('div', { class: 'sub' }, t('score.us')), h('div', { class: 'n' }, num(S.scores[my])), usScored ? h('div', { class: 'plus' }, `+${num(r.points)}`) : null),
+      h('div', { class: 'them' }, h('div', { class: 'sub' }, t('score.them')), h('div', { class: 'n' }, num(S.scores[1 - my])), !usScored ? h('div', { class: 'plus' }, `+${num(r.points)}`) : null)),
   );
   if (S.phase === 'roundEnd') {
     const iReady = S.ready.includes(S.you);
-    const waiting = S.seats.map((s, i) => i).filter((i) => S.seats[i].kind === 'human' && !S.ready.includes(i));
-    modal.append(h('button', { class: 'primary', disabled: iReady, onclick: () => send({ t: 'ready' }) }, iReady ? 'Waiting for others…' : 'Next round'));
-    if (iReady && waiting.length) modal.append(h('div', { class: 'sub' }, `Waiting for ${waiting.map(nameOf).join(', ')}`));
+    const waiting = S.seats.map((x, i) => i).filter((i) => S.seats[i].kind === 'human' && !S.ready.includes(i));
+    modal.append(h('button', { class: 'primary', disabled: iReady, onclick: () => send({ t: 'ready' }) }, t(iReady ? 'end.waitOthers' : 'end.next')));
+    if (iReady && waiting.length) modal.append(h('div', { class: 'sub' }, t('end.waitNames', { names: waiting.map(nm).join(I18N.isFa() ? '، ' : ', ') })));
   } else {
-    modal.append(h('button', { class: 'primary', onclick: () => send({ t: 'lobby' }) }, 'Back to lobby'),
-      h('button', { onclick: leave }, 'Leave room'));
+    modal.append(h('button', { class: 'primary', onclick: () => send({ t: 'lobby' }) }, t('end.lobby')),
+      h('button', { onclick: leave }, t('end.leave')));
   }
   ov.replaceChildren(modal);
   ov.classList.remove('hidden');
@@ -710,7 +707,7 @@ let chatMsgs = [];
 let chatUnread = 0;
 let chatOpen = false;
 const bubbles = {}; // seat -> { text, until }
-const QUICK = ['Nice!', 'Oops', 'Your lead', 'Good game'];
+const QUICK = ['q.nice', 'q.oops', 'q.lead', 'q.gg'];
 
 function setChatBadge() {
   document.querySelectorAll('.chat-btn .badge-n').forEach((b) => {
@@ -723,7 +720,7 @@ function renderChat() {
   const log = $('chat-log');
   log.replaceChildren(...chatMsgs.map((m) => h('div', { class: `cm ${S && m.seat === S.you && m.name === S.seats[S.you].name ? 'mine' : ''}` },
     h('span', { class: 'cn' }, m.name), h('span', { class: 'ct' }, m.text))));
-  if (!chatMsgs.length) log.append(h('div', { class: 'chat-empty' }, 'No messages yet. Say hi!'));
+  if (!chatMsgs.length) log.append(h('div', { class: 'chat-empty' }, t('chat.empty')));
   log.scrollTop = log.scrollHeight;
   setChatBadge();
 }
@@ -761,7 +758,37 @@ $('chat-form').addEventListener('submit', (e) => {
   send({ t: 'chat', text });
   $('chat-input').value = '';
 });
-$('chat-quick').replaceChildren(...QUICK.map((q) => h('button', { class: 'small', type: 'button', onclick: () => send({ t: 'chat', text: q }) }, q)));
+function renderQuick() {
+  $('chat-quick').replaceChildren(...QUICK.map((k) => h('button', { class: 'small', type: 'button', onclick: () => send({ t: 'chat', text: t(k) }) }, t(k))));
+}
+renderQuick();
+
+// ------------------------------------------------------------- language switch (flags) and settings
+
+const FLAGS = [['fa', 'flags/ir-lion-sun.svg', 'فارسی'], ['en', 'flags/us.svg', 'English']];
+function renderLangSwitches() {
+  document.querySelectorAll('[data-lang-switch]').forEach((box) => {
+    box.replaceChildren(...FLAGS.map(([code, src, name]) => h('button', {
+      class: `flag-btn ${I18N.lang() === code ? 'on' : ''}`, type: 'button', title: name, 'aria-label': name,
+      'aria-pressed': String(I18N.lang() === code), onclick: () => I18N.setLang(code),
+    }, h('img', { src, alt: '', width: 36, height: 24, draggable: 'false' }))));
+  });
+}
+function setSettingsOpen(open) { $('settings').classList.toggle('hidden', !open); }
+document.querySelectorAll('.gear').forEach((b) => b.addEventListener('click', () => setSettingsOpen($('settings').classList.contains('hidden'))));
+$('settings-close').addEventListener('click', () => setSettingsOpen(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettingsOpen(false); });
+$('set-faces').checked = I18N.faceFa();
+$('set-faces').addEventListener('change', () => I18N.setFaceFa($('set-faces').checked));
+I18N.onChange(() => {
+  renderLangSwitches();
+  renderQuick();
+  renderChat();
+  $('set-faces').checked = I18N.faceFa();
+  $('home-msg').textContent = '';
+  if (S) render();
+});
+renderLangSwitches();
 
 // ------------------------------------------------------------- phones: orientation, sleep, wake lock
 
@@ -789,7 +816,7 @@ document.addEventListener('pointerdown', keepAwake, { passive: true });
     connect();
   } else if (hash.length === 4) {
     $('code').value = hash;
-    $('home-msg').textContent = 'Enter your name and press Join room';
+    $('home-msg').textContent = t('home.nameAndJoin');
   }
   render();
 })();

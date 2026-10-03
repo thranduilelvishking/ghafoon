@@ -42,6 +42,23 @@ while the opponents hold fewer than 14 - R tricks, so the list shrinks as they w
 NO: a single YES makes the raise stand (the opponents then bust the Hakem with 14 - R tricks, for 2 x R points), and if
 both say NO the round ends at once and the Hakem's team wins the original reading. ALL scores like a Sheet (26).
 
+## Languages (Persian / English)
+
+The game opens in Persian and each player can switch to English (and back) at any time with the flag buttons (the Lion
+and Sun flag for Persian, the US flag for English; on phones they are inside the gear panel). The choice is remembered
+on that device, and players in the same room can use different languages, because only the screen text changes. The name
+"Ghafoon" is never translated.
+
+- All texts live in `public/i18n.js` (English and Persian side by side). `test/i18n.test.js` checks that both languages
+  have the same keys and placeholders, that every key the client uses exists, and that the words agreed for the game are
+  the ones in use. The Persian is written in an informal, spoken style.
+- Persian reads right to left, but the table, the hand and the lobby seats are physical positions and never mirror.
+- Persian digits and the Persian card names (آس، شاه، بی‌بی، سرباز) are used in Persian mode; the gear panel has a switch
+  to show the printed A K Q J and 0-9 on the cards instead.
+- Seats are lettered A B C D; A with B and C with D are partners and sit opposite each other.
+- The font is Vazirmatn (SIL Open Font License, `public/fonts/OFL.txt`), bundled so the game works offline.
+- Player names and chat messages are shown exactly as typed.
+
 ## Chat
 
 People in a room can chat from the lobby and during the game (the 💬 button; bots stay quiet). Messages are plain text,

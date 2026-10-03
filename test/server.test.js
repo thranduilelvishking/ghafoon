@@ -16,7 +16,7 @@ function listen() {
 // A scripted "human": it reacts to state messages by using the bot brain.
 function client(port, { auto = true } = {}) {
   const ws = new WebSocket(`ws://localhost:${port}/ws`);
-  const c = { ws, state: null, joined: null, errors: [], notices: [], chat: [], chatLog: null, played: new Set(), auto, states: 0 };
+  const c = { ws, state: null, joined: null, errors: [], notices: [], noticeCodes: [], chat: [], chatLog: null, played: new Set(), auto, states: 0 };
   const send = (o) => ws.send(JSON.stringify(o));
   c.send = send;
   c.waitFor = (pred, ms = 20000) => new Promise((resolve, reject) => {
@@ -30,7 +30,7 @@ function client(port, { auto = true } = {}) {
     const m = JSON.parse(data);
     if (m.t === 'joined') c.joined = m;
     if (m.t === 'error') c.errors.push(m.msg);
-    if (m.t === 'notice') c.notices.push(m.msg);
+    if (m.t === 'notice') { c.notices.push(m.msg); c.noticeCodes.push([m.code, m.name]); }
     if (m.t === 'chat') c.chat.push(m.msg);
     if (m.t === 'chatLog') c.chatLog = m.msgs;
     if (m.t !== 'state') return;
@@ -225,6 +225,7 @@ test('swap: the other person must accept, and then the two really trade places (
   assert.strictEqual(a.state.swapOut, 1);
   assert.strictEqual(a.state.seats[0].name, 'Ann'); // nothing has moved yet
   assert.ok(b.notices.some((n) => /Ann would like to swap/.test(n)));
+  assert.deepStrictEqual(b.noticeCodes[0], ['swapAsk', 'Ann'], 'notices carry a code and a name so each player can read them in their own language');
   b.send({ t: 'swapReply', seat: 0, accept: true });
   await a.waitFor((x) => x.state.seats[0].name === 'Bo' && x.state.seats[1].name === 'Ann');
   assert.strictEqual(a.state.you, 1);

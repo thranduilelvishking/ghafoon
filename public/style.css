@@ -326,3 +326,54 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .say::before { content: ''; position: absolute; left: -6px; top: 50%; width: 12px; height: 12px; background: #fbf8ef; transform: translateY(-50%) rotate(45deg); }
 .seat.p3 .say { left: auto; right: calc(100% + 10px); }
 .seat.p3 .say::before { left: auto; right: -6px; }
+
+/* ---------- Persian (right to left), flags, settings */
+@font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazirmatn-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200D; }
+@font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazirmatn-Bold.woff2') format('woff2'); font-weight: 700; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200D; }
+body.fa, body.fa button, body.fa input { font-family: 'Vazirmatn', system-ui, -apple-system, "Segoe UI", Tahoma, Roboto, sans-serif; }
+body.fa { font-size: 16px; }
+/* letter-spacing would break the joined Persian letters */
+body.fa * { letter-spacing: 0 !important; }
+
+/* the table, the hand and the lobby seats are physical positions: they never mirror */
+.table, .hand, .lobby-table, .drawpile { direction: ltr; }
+/* what people type (names, chat) takes its direction from its own first letter */
+.say, .cm, .nm { unicode-bidi: plaintext; }
+/* in Persian every interface sentence and button row reads right to left, even inside the (left-to-right) table;
+   names inside a sentence are isolated by the script so they cannot scramble it */
+body.fa .status, body.fa .hint, body.fa .rule, body.fa .by, body.fa .sub, body.fa .role, body.fa .lab, body.fa .tricks-box > div,
+body.fa .hokm-box > div, body.fa .modal div, body.fa .tag, body.fa .msg, body.fa .banner .w, body.fa .chip, body.fa .badge,
+body.fa .vsline, body.fa .toast, body.fa .chat-empty, body.fa .actions, body.fa .actions .group, body.fa .goal, body.fa .vs {
+  direction: rtl; unicode-bidi: isolate;
+}
+.status, .hint, .modal, .banner, .role, .nm, .sub { text-align: center; }
+.tricks-box > div, .hokm-box > div { text-align: start; }
+
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lang-switch { display: flex; gap: 6px; align-items: center; direction: ltr; }
+.flag-btn { padding: 3px; border-radius: 9px; background: transparent; border: 2px solid transparent; opacity: .55; line-height: 0; cursor: pointer; }
+.flag-btn:hover:not(:disabled) { background: #ffffff14; opacity: .9; }
+.flag-btn.on { opacity: 1; border-color: var(--accent); background: #ffffff10; }
+.flag-btn img { display: block; border-radius: 3px; box-shadow: 0 1px 3px #0008; }
+.gear { padding: 6px 10px; font-size: 18px; line-height: 1; }
+.gear.small { padding: 5px 9px; font-size: 16px; }
+.top-actions .flag-btn img { width: 30px; height: 20px; }
+
+.settings { position: fixed; top: 54px; inset-inline-end: 12px; z-index: 18; width: min(300px, calc(100vw - 24px)); background: #14231f; border: 1px solid #2b4a40; border-radius: 14px; box-shadow: 0 16px 50px #000a; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.settings-head { display: flex; justify-content: space-between; align-items: center; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings-row.check { justify-content: flex-start; gap: 10px; cursor: pointer; color: var(--ink); font-size: inherit; flex-direction: row; }
+.settings-row.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.card .r.long { font-size: calc(var(--cw) * .26); line-height: 1.15; }
+.card .corner { width: auto; min-width: calc(var(--cw) * .34); align-items: flex-start; }
+.card.tiny .r.long, .card.mini .r.long { font-size: calc(var(--cw) * .3); }
+
+/* narrow screens: the flags live in the settings panel (the gear), so the top bar stays uncrowded */
+@media (max-width: 640px) {
+  .top-actions .lang-switch { display: none; }
+  .top-actions { gap: 6px; }
+  .scoreboard { gap: 8px; }
+  .scoreboard .goal { white-space: nowrap; }
+}
+.modal .vs .plus, .scoreboard .big { direction: ltr; unicode-bidi: isolate; }
