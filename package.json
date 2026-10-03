@@ -1,0 +1,14 @@
+{
+  "name": "ghafoon",
+  "version": "1.0.0",
+  "description": "Ghafoon - a 4-player trick-taking card game for the browser",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test test/engine.test.js test/server.test.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
+}
