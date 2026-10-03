@@ -107,9 +107,16 @@ function onMessage(m) {
       render();
       $('home-msg').textContent = m.msg;
     } else toast(m.msg);
+  } else if (m.t === 'chatLog') {
+    chatMsgs = m.msgs.slice();
+    chatUnread = 0;
+    renderChat();
+  } else if (m.t === 'chat') {
+    onChat(m.msg);
   } else if (m.t === 'notice') {
     toast(m.msg, true);
   } else if (m.t === 'left') {
+    chatMsgs = []; chatUnread = 0; setChatOpen(false);
     save(null);
     S = null;
     history.replaceState(null, '', location.pathname);
@@ -383,6 +390,7 @@ function seatPlate(i) {
     backs,
     h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}`, title: crown ? 'Hakem' : null },
       crown || chip || plus ? h('div', { class: 'over' }, crown, chip, plus) : null,
+      bubbles[i] && bubbles[i].until > Date.now() ? h('div', { class: 'say' }, bubbles[i].text) : null,
       h('div', { class: 'nm' }, info.name + (i === S.you ? ' (you)' : '')),
       h('div', { class: 'badges' }, badges),
       rel === 0 ? null : h('div', { class: 'cnt' }, `${S.counts[i]} cards`),
@@ -695,6 +703,65 @@ function renderOverlay() {
   ov.replaceChildren(modal);
   ov.classList.remove('hidden');
 }
+
+// ------------------------------------------------------------- chat
+
+let chatMsgs = [];
+let chatUnread = 0;
+let chatOpen = false;
+const bubbles = {}; // seat -> { text, until }
+const QUICK = ['Nice!', 'Oops', 'Your lead', 'Good game'];
+
+function setChatBadge() {
+  document.querySelectorAll('.chat-btn .badge-n').forEach((b) => {
+    b.textContent = chatUnread > 9 ? '9+' : String(chatUnread);
+    b.classList.toggle('hidden', chatUnread === 0);
+  });
+}
+
+function renderChat() {
+  const log = $('chat-log');
+  log.replaceChildren(...chatMsgs.map((m) => h('div', { class: `cm ${S && m.seat === S.you && m.name === S.seats[S.you].name ? 'mine' : ''}` },
+    h('span', { class: 'cn' }, m.name), h('span', { class: 'ct' }, m.text))));
+  if (!chatMsgs.length) log.append(h('div', { class: 'chat-empty' }, 'No messages yet. Say hi!'));
+  log.scrollTop = log.scrollHeight;
+  setChatBadge();
+}
+
+function onChat(m) {
+  chatMsgs.push(m);
+  if (chatMsgs.length > 60) chatMsgs.shift();
+  const mine = S && m.seat === S.you && S.seats[S.you] && m.name === S.seats[S.you].name;
+  if (!chatOpen && !mine) chatUnread++;
+  renderChat();
+  if (S && S.mode === 'game') {
+    bubbles[m.seat] = { text: m.text, until: Date.now() + 6000 };
+    renderTable();
+    setTimeout(() => { if (S && S.mode === 'game') renderTable(); }, 6100);
+  }
+}
+
+function setChatOpen(open) {
+  chatOpen = open;
+  $('chat').classList.toggle('hidden', !open);
+  if (open) {
+    chatUnread = 0;
+    setChatBadge();
+    renderChat();
+    if (!COARSE) $('chat-input').focus();
+  }
+}
+document.querySelectorAll('.chat-btn').forEach((b) => b.addEventListener('click', () => setChatOpen(!chatOpen)));
+$('chat-close').addEventListener('click', () => setChatOpen(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && chatOpen) setChatOpen(false); });
+$('chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('chat-input').value.trim();
+  if (!text) return;
+  send({ t: 'chat', text });
+  $('chat-input').value = '';
+});
+$('chat-quick').replaceChildren(...QUICK.map((q) => h('button', { class: 'small', type: 'button', onclick: () => send({ t: 'chat', text: q }) }, q)));
 
 // ------------------------------------------------------------- phones: orientation, sleep, wake lock
 

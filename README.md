@@ -42,6 +42,12 @@ while the opponents hold fewer than 14 - R tricks, so the list shrinks as they w
 NO: a single YES makes the raise stand (the opponents then bust the Hakem with 14 - R tricks, for 2 x R points), and if
 both say NO the round ends at once and the Hakem's team wins the original reading. ALL scores like a Sheet (26).
 
+## Chat
+
+People in a room can chat from the lobby and during the game (the 💬 button; bots stay quiet). Messages are plain text,
+capped at 200 characters, limited to 5 per 10 seconds per person, and the last 60 are kept so someone who reconnects sees
+the history. During play a new message also pops up as a speech bubble next to the sender's name plate.
+
 ## Shuffling
 
 The first round of a game gets a full Fisher-Yates shuffle (after the "first Ace" draw that picks the Sardast).

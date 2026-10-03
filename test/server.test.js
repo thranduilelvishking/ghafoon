@@ -16,7 +16,7 @@ function listen() {
 // A scripted "human": it reacts to state messages by using the bot brain.
 function client(port, { auto = true } = {}) {
   const ws = new WebSocket(`ws://localhost:${port}/ws`);
-  const c = { ws, state: null, joined: null, errors: [], notices: [], played: new Set(), auto, states: 0 };
+  const c = { ws, state: null, joined: null, errors: [], notices: [], chat: [], chatLog: null, played: new Set(), auto, states: 0 };
   const send = (o) => ws.send(JSON.stringify(o));
   c.send = send;
   c.waitFor = (pred, ms = 20000) => new Promise((resolve, reject) => {
@@ -31,6 +31,8 @@ function client(port, { auto = true } = {}) {
     if (m.t === 'joined') c.joined = m;
     if (m.t === 'error') c.errors.push(m.msg);
     if (m.t === 'notice') c.notices.push(m.msg);
+    if (m.t === 'chat') c.chat.push(m.msg);
+    if (m.t === 'chatLog') c.chatLog = m.msgs;
     if (m.t !== 'state') return;
     c.state = m;
     c.states++;
@@ -290,5 +292,64 @@ test('swap: answering one request clears the others that involve the same people
   assert.deepStrictEqual(a.state.swapIn, []);
   assert.strictEqual(c.state.swapOut, -1, "Cy's request to the person who moved is dropped");
   [a, b, c].forEach((x) => x.ws.close());
+  server.close();
+});
+
+
+test('chat: messages reach everybody in the room, cleaned up and capped; late joiners get the history', async () => {
+  const { server, port } = await listen();
+  const [a, b] = await lobbyOf(port, ['Ann', 'Bo']);
+  a.send({ t: 'chat', text: '  hello\u0007   there \n  friend  ' });
+  await b.waitFor((x) => x.chat.length === 1);
+  assert.strictEqual(b.chat[0].text, 'hello there friend');
+  assert.strictEqual(b.chat[0].name, 'Ann');
+  assert.strictEqual(b.chat[0].seat, 0);
+  await a.waitFor((x) => x.chat.length === 1); // the sender sees their own message too
+  a.send({ t: 'chat', text: '   ' });
+  a.send({ t: 'chat' });
+  a.send({ t: 'chat', text: 'x'.repeat(500) });
+  await b.waitFor((x) => x.chat.length === 2);
+  assert.strictEqual(b.chat[1].text.length, 200);
+  await settle();
+  assert.strictEqual(b.chat.length, 2, 'empty messages are ignored');
+  // a third person joins later and receives the history
+  const c = await client(port, { auto: false });
+  c.send({ t: 'join', room: a.joined.room, name: 'Cy' });
+  await c.waitFor((x) => x.chatLog);
+  assert.deepStrictEqual(c.chatLog.map((m) => m.text.slice(0, 11)), ['hello there', 'xxxxxxxxxxx']);
+  // chat markup is just text: the server never interprets it
+  b.send({ t: 'chat', text: '<img src=x onerror=alert(1)>' });
+  await a.waitFor((x) => x.chat.length === 3);
+  assert.strictEqual(a.chat[2].text, '<img src=x onerror=alert(1)>');
+  [a, b, c].forEach((x) => x.ws.close());
+  server.close();
+});
+
+test('chat: sending too many messages too fast is refused, and strangers outside the room cannot chat', async () => {
+  const { server, port } = await listen();
+  const [a, b] = await lobbyOf(port, ['Ann', 'Bo']);
+  for (let i = 0; i < 8; i++) a.send({ t: 'chat', text: 'spam ' + i });
+  await settle(); await settle();
+  assert.strictEqual(b.chat.length, 5, 'only the first five get through');
+  assert.ok(a.errors.some((e) => /too fast/.test(e)));
+  b.send({ t: 'chat', text: 'still fine' }); // another person has their own allowance
+  await a.waitFor((x) => x.chat.length === 6);
+  const stranger = await client(port, { auto: false }); // never joined a room
+  stranger.send({ t: 'chat', text: 'hi from outside' });
+  await settle();
+  assert.strictEqual(a.chat.length, 6);
+  [a, b, stranger].forEach((x) => x.ws.close());
+  server.close();
+});
+
+test('chat keeps working during a game', async () => {
+  const { server, port } = await listen();
+  const [a, b] = await lobbyOf(port, ['Ann', 'Bo']);
+  a.send({ t: 'start' });
+  await b.waitFor((x) => x.state.mode === 'game');
+  b.send({ t: 'chat', text: 'good luck' });
+  await a.waitFor((x) => x.chat.some((m) => m.text === 'good luck'));
+  assert.strictEqual(a.chat.find((m) => m.text === 'good luck').seat, 1);
+  [a, b].forEach((x) => x.ws.close());
   server.close();
 });

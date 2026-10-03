@@ -28,6 +28,11 @@ const TIMING = {
   ...(process.env.GHAFOON_FAST ? { draw: 50, trickEnd: 20, roundEndMax: 100, botBid: 5, botHakem: 5, botHokm: 5, botPlay: 5, botVote: 5, voteMax: 100 } : {}),
 };
 
+const CHAT_MAX = 200; // characters per message
+const CHAT_KEEP = 60; // messages remembered per room
+const CHAT_BURST = 5; // at most this many messages per CHAT_WINDOW ms from one person
+const CHAT_WINDOW = 10000;
+
 const rooms = new Map();
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -52,6 +57,8 @@ class Room {
     this.deleteTimer = null;
     this.hostToken = null;
     this.swaps = []; // pending seat-swap requests: { from: token, to: token, at }
+    this.chat = []; // the last CHAT_KEEP messages: { id, name, seat, text, at }
+    this.chatId = 0;
   }
 
   // ---- seats
@@ -126,6 +133,25 @@ class Room {
     h.ws = ws;
     h.awaySince = null;
     ws.ctx = { room: this, token: h.token };
+  }
+
+  // ---- chat: people only (bots stay quiet). Plain text, trimmed and capped, with a small rate limit.
+  chatSend(seat, raw) {
+    const h = this.seats[seat].human;
+    const text = String(raw == null ? '' : raw).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+    if (!text) return;
+    const now = Date.now();
+    h.chatTimes = (h.chatTimes || []).filter((t) => now - t < CHAT_WINDOW);
+    if (h.chatTimes.length >= CHAT_BURST) throw new GameError('You are sending messages too fast');
+    h.chatTimes.push(now);
+    const msg = { id: ++this.chatId, name: h.name, seat, text, at: now };
+    this.chat.push(msg);
+    if (this.chat.length > CHAT_KEEP) this.chat.shift();
+    for (let i = 0; i < 4; i++) if (this.isConnected(i)) send(this.seats[i].human.ws, { t: 'chat', msg });
+  }
+
+  sendChatLog(ws) {
+    send(ws, { t: 'chatLog', msgs: this.chat });
   }
 
   // ---- seat swaps (lobby only): ask the person sitting there, nothing moves unless they accept
@@ -444,6 +470,9 @@ class Room {
         this.seats[seat].human = null;
         return this.changed();
       }
+      case 'chat':
+        this.chatSend(seat, msg.text);
+        return;
       case 'swap':
         this.swapRequest(seat, msg.seat);
         return this.changed();
@@ -535,6 +564,7 @@ function handleJoin(ws, msg) {
   }
   if (msg.create) room.hostToken = room.seats[seat].human.token;
   send(ws, { t: 'joined', room: room.code, token: room.seats[seat].human.token, seat });
+  room.sendChatLog(ws);
   clearTimeout(room.deleteTimer);
   room.deleteTimer = null;
   if (msg.create && msg.solo) return room.startGame();
