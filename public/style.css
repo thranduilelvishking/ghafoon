@@ -43,12 +43,23 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .share input { flex: 1; font-size: 13px; }
 .msg { min-height: 1.2em; margin: 0; color: #ff9d8a; text-align: center; font-size: 13px; }
 .code { background: #0c1714; border: 1px solid #2f5246; border-radius: 8px; padding: 2px 10px; letter-spacing: 4px; color: var(--accent); }
-.lobby-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.lseat { border: 1px dashed #3b6556; border-radius: 12px; padding: 14px; min-height: 76px; display: flex; flex-direction: column; justify-content: center; gap: 2px; background: #0f1d19; text-align: left; }
-.lseat.empty:hover { background: #17302a; cursor: pointer; }
-.lseat.me { border-style: solid; border-color: var(--accent); }
-.lseat .nm { font-weight: 600; }
+.lobby-table { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr); grid-template-areas: ". top ." "left mid right" ". bottom ."; gap: 10px; padding: 14px; border-radius: 22px; background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 100%); border: 3px solid #0a2a20; }
+.lseat { border: 2px dashed #3b6556; border-radius: 12px; padding: 10px 8px; min-height: 76px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; background: #0b1f18cc; text-align: center; color: var(--ink); min-width: 0; }
+.lseat.p0 { grid-area: bottom; } .lseat.p1 { grid-area: left; } .lseat.p2 { grid-area: top; } .lseat.p3 { grid-area: right; }
+.lseat.empty { cursor: pointer; }
+.lseat.empty:hover, .lseat.empty:focus-visible { background: #17302a; outline: none; border-color: var(--accent); }
+.lseat:not(.empty) { border-style: solid; }
+.lseat.us:not(.empty) { border-color: var(--us); } .lseat.them:not(.empty) { border-color: var(--them); }
+.lseat.me { box-shadow: 0 0 14px #e8c15a77; border-color: var(--accent) !important; }
+.lseat .role { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.lseat .nm { font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lseat.us .nm { color: var(--us); } .lseat.them .nm { color: var(--them); }
+.lseat.empty .nm { color: var(--muted); font-weight: 500; }
 .lseat .sub { color: var(--muted); font-size: 12px; }
+.lmid { grid-area: mid; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; font-size: 12px; min-width: 0; }
+.lmid .vsline { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.lmid .vsline.us { color: var(--us); } .lmid .vsline.them { color: var(--them); }
+.lmid .vs { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
 .team-a { color: var(--us); } .team-b { color: var(--them); }
 
 /* ---------- game layout */

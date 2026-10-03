@@ -36,7 +36,7 @@ function newCode() {
   }
 }
 
-const cleanName = (n) => String(n || '').replace(/[^\p{L}\p{N} _.-]/gu, '').trim().slice(0, 14) || 'Player';
+const cleanName = (n) => String(n || '').replace(/[^\p{L}\p{N} _.-]/gu, '').trim().slice(0, 14);
 
 class Room {
   constructor(code) {
@@ -91,9 +91,18 @@ class Room {
     }
     if (seat < 0) return -1;
     const token = crypto.randomBytes(12).toString('hex');
-    this.seats[seat].human = { token, name, ws, awaySince: null };
+    this.seats[seat].human = { token, name: this.uniqueName(name || `Player ${seat + 1}`, -1), ws, awaySince: null };
     ws.ctx = { room: this, token };
     return seat;
+  }
+
+  // Names are unique within a room (case-insensitive): a second "Sara" becomes "Sara 2".
+  uniqueName(name, exceptSeat) {
+    const taken = new Set(this.seats.map((s, i) => (s.human && i !== exceptSeat ? s.human.name.toLowerCase() : null)));
+    BOT_NAMES.forEach((n) => taken.add(n.toLowerCase()));
+    let out = name;
+    for (let n = 2; taken.has(out.toLowerCase()); n++) out = `${name.slice(0, 11)} ${n}`;
+    return out;
   }
 
   attach(seat, ws) {
@@ -302,6 +311,12 @@ class Room {
     if (seat < 0) return;
     const g = this.game;
     switch (msg.t) {
+      case 'rename': {
+        const name = cleanName(msg.name);
+        if (!name) throw new GameError('Enter a name');
+        this.seats[seat].human.name = this.uniqueName(name, seat);
+        return this.changed();
+      }
       case 'sit': {
         if (this.mode !== 'lobby') return;
         const to = msg.seat;

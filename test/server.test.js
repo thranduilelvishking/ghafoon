@@ -128,3 +128,29 @@ test('unknown room is rejected', async () => {
   a.ws.close();
   server.close();
 });
+
+test('names: duplicates get a suffix, rename works, empty name falls back to the seat number', async () => {
+  const { server, port } = await listen();
+  const a = await client(port, { auto: false });
+  a.send({ t: 'join', create: true, name: 'Sara' });
+  await a.waitFor((x) => x.joined);
+  const b = await client(port, { auto: false });
+  b.send({ t: 'join', room: a.joined.room, name: 'sara' });
+  await b.waitFor((x) => x.joined);
+  const c = await client(port, { auto: false });
+  c.send({ t: 'join', room: a.joined.room, name: '' });
+  await c.waitFor((x) => x.joined);
+  await a.waitFor((x) => x.state.seats[2].kind === 'human');
+  assert.deepStrictEqual(a.state.seats.slice(0, 3).map((s) => s.name), ['Sara', 'sara 2', 'Player 3']);
+  // rename: collides with Sara -> suffix; bot names are reserved too
+  b.send({ t: 'rename', name: 'SARA' });
+  await a.waitFor((x) => x.state.seats[1].name === 'SARA 2');
+  b.send({ t: 'rename', name: 'Arash' });
+  await a.waitFor((x) => x.state.seats[1].name === 'Arash 2');
+  b.send({ t: 'rename', name: '   ' });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(b.errors.length > 0);
+  assert.strictEqual(a.state.seats[1].name, 'Arash 2');
+  a.ws.close(); b.ws.close(); c.ws.close();
+  server.close();
+});

@@ -51,7 +51,16 @@ function save(s) {
 function myName() {
   const n = $('name').value.trim();
   try { localStorage.setItem('ghafoon-name', n); } catch (e) { /* ignore */ }
-  return n || 'Player';
+  return n;
+}
+// Returns the name, or shows a hint and returns '' when the player has not typed one.
+function requireName() {
+  const n = myName();
+  if (!n) {
+    $('home-msg').textContent = 'Pick a name first';
+    $('name').focus();
+  }
+  return n;
 }
 
 function connect(then) {
@@ -108,13 +117,23 @@ function toast(msg) {
 // ------------------------------------------------------------- home / lobby actions
 
 $('name').value = (() => { try { return localStorage.getItem('ghafoon-name') || ''; } catch (e) { return ''; } })();
-$('btn-solo').onclick = () => connect(() => send({ t: 'join', create: true, solo: true, name: myName() }));
-$('btn-create').onclick = () => connect(() => send({ t: 'join', create: true, name: myName() }));
+$('btn-solo').onclick = () => { const name = requireName(); if (name) connect(() => send({ t: 'join', create: true, solo: true, name })); };
+$('btn-create').onclick = () => { const name = requireName(); if (name) connect(() => send({ t: 'join', create: true, name })); };
 $('btn-join').onclick = () => {
+  const name = requireName();
+  if (!name) return;
   const room = $('code').value.trim().toUpperCase();
   if (room.length !== 4) { $('home-msg').textContent = 'Enter the 4-letter room code'; return; }
-  connect(() => send({ t: 'join', room, name: myName() }));
+  connect(() => send({ t: 'join', room, name }));
 };
+$('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-create').click(); });
+$('name').addEventListener('input', () => { $('home-msg').textContent = ''; });
+$('lobby-name').addEventListener('change', () => {
+  const n = $('lobby-name').value.trim();
+  if (!n) return;
+  try { localStorage.setItem('ghafoon-name', n); } catch (e) { /* ignore */ }
+  send({ t: 'rename', name: n });
+});
 $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-join').click(); });
 $('btn-copy').onclick = () => {
   const el = $('share-link');
@@ -149,20 +168,35 @@ function renderLobby() {
   $('overlay').classList.add('hidden');
   $('lobby-code').textContent = S.room;
   $('share-link').value = `${location.origin}/#${S.room}`;
-  const box = $('lobby-seats');
-  box.replaceChildren(...S.seats.map((s, i) => {
+  const nameBox = $('lobby-name');
+  if (document.activeElement !== nameBox) nameBox.value = S.seats[S.you].name;
+
+  // Same view as the game: you at the bottom, your partner across, opponents left and right.
+  const myTeam = S.you % 2;
+  const seatEls = S.seats.map((s, i) => {
+    const rel = (i - S.you + 4) % 4;
     const me = i === S.you;
-    const team = i % 2 === 0 ? 'Team A' : 'Team B';
-    const partner = (i + 2) % 4;
+    const mine = i % 2 === myTeam;
+    const role = me ? 'You' : rel === 2 ? 'Your partner' : 'Opponent';
     return h('div', {
-      class: `lseat ${s.kind === 'empty' ? 'empty' : ''} ${me ? 'me' : ''}`,
+      class: `lseat ${POS[rel]} ${mine ? 'us' : 'them'} ${s.kind === 'empty' ? 'empty' : ''} ${me ? 'me' : ''}`,
+      role: s.kind === 'empty' ? 'button' : null,
+      tabindex: s.kind === 'empty' ? '0' : null,
       onclick: s.kind === 'empty' ? () => send({ t: 'sit', seat: i }) : null,
     },
-      h('div', { class: 'nm' }, s.kind === 'empty' ? 'Empty: a bot will play' : s.name + (me ? ' (you)' : '')),
-      h('div', { class: `sub ${i % 2 === 0 ? 'team-a' : 'team-b'}` }, `${team}, partner of seat ${partner + 1}`),
-      s.kind === 'empty' ? h('div', { class: 'sub' }, 'Click to sit here') : null,
+      h('div', { class: 'role' }, role),
+      h('div', { class: 'nm' }, s.kind === 'empty' ? 'Empty' : s.name),
+      h('div', { class: 'sub' }, s.kind === 'empty' ? 'Bot, tap to sit' : s.kind === 'human' ? 'Player' : s.kind),
     );
-  }));
+  });
+  const partnerSeat = (S.you + 2) % 4;
+  const named = (i) => (S.seats[i].kind === 'empty' ? 'bot' : S.seats[i].name);
+  const mid = h('div', { class: 'lmid' },
+    h('div', { class: 'vsline us' }, `${S.seats[S.you].name} + ${named(partnerSeat)}`),
+    h('div', { class: 'vs' }, 'vs'),
+    h('div', { class: 'vsline them' }, `${named((S.you + 1) % 4)} + ${named((S.you + 3) % 4)}`));
+  $('lobby-seats').replaceChildren(...seatEls, mid);
+
   const host = S.host === S.you;
   $('btn-start').disabled = !host;
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
