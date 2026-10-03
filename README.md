@@ -34,6 +34,14 @@ In every contract following suit is mandatory and only a card of the led suit (o
 so a 2 of clubs never beats a 3 of spades that was led. The Hakem must still take all 13 tricks (the bag counts as
 one): 26 points if they do, 26 to the opponents if they lose a single trick. Readings below Sheet are always Hokm.
 
+## Raising the reading
+
+Once per round the Hakem may raise their reading during play (from right after naming Hokm, any time up to the
+end): the **+** next to their bid offers every number above it, up to **ALL** (13). A raise to R is only possible
+while the opponents hold fewer than 14 - R tricks, so the list shrinks as they win tricks. Both opponents answer YES or
+NO: a single YES makes the raise stand (the opponents then bust the Hakem with 14 - R tricks, for 2 x R points), and if
+both say NO the round ends at once and the Hakem's team wins the original reading. ALL scores like a Sheet (26).
+
 ## Shuffling
 
 The first round of a game gets a full Fisher-Yates shuffle (after the "first Ace" draw that picks the Sardast).
