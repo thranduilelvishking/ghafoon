@@ -378,4 +378,80 @@ function trumpsOutside(ctx, suit) {
   return false;
 }
 
-module.exports = { estimateTricks, chooseBid, chooseBidHeuristic, chooseHakem, chooseDiscards, choosePlay, bestHokm };
+// ---------------------------------------------------------------- raising the reading
+
+// Plays the rest of a round out from a given position and returns how many tricks the Hakem's team ends up with.
+function simulateFrom(st) {
+  const { hands, hakem, hokm, mode, played, trickLog } = st;
+  const counts = st.tricks.slice();
+  let plays = st.plays.slice();
+  let seat = st.turn;
+  for (;;) {
+    while (plays.length < 4) {
+      const card = choosePlay({ seat, hand: hands[seat], plays, hokm, mode, hakem, reading: 0, tricks: counts, played, trickLog });
+      hands[seat] = hands[seat].filter((c) => c !== card);
+      plays.push({ seat, card });
+      seat = (seat + 1) % 4;
+    }
+    const winner = trickWinner(plays, hokm, mode);
+    counts[teamOf(winner)]++;
+    plays.forEach((p) => played.add(p.card));
+    trickLog.push({ plays, winner });
+    plays = [];
+    seat = winner;
+    if (hands[seat].length === 0) break;
+  }
+  return counts[teamOf(hakem)];
+}
+
+// Deals the cards this seat cannot see out at random (respecting who has already shown a void) and plays the
+// round to the end, `samples` times. Returns the Hakem team's final trick counts, one per deal.
+// ctx: { seat, hand, plays, turn, hokm, mode, hakem, tricks, played:Set, trickLog, counts:[4 hand sizes], bag? }
+function sampleOutcomes(ctx, samples) {
+  const { seat, hand, plays, hokm, hakem, played, trickLog, counts } = ctx;
+  const mode = ctx.mode || 'normal';
+  const known = new Set([...hand, ...played, ...plays.map((p) => p.card), ...(ctx.bag || [])]);
+  const pool = [];
+  for (let c = 0; c < 52; c++) if (!known.has(c)) pool.push(c);
+  const others = [0, 1, 2, 3].filter((x) => x !== seat);
+  const voids = knownVoids(trickLog, plays);
+  const out = [];
+  for (let n = 0; n < samples; n++) {
+    let hands = null;
+    for (let attempt = 0; attempt < 25; attempt++) {
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      hands = [null, null, null, null];
+      hands[seat] = hand.slice();
+      let at = 0;
+      for (const o of others) { hands[o] = pool.slice(at, at + counts[o]); at += counts[o]; }
+      if (others.every((o) => !hands[o].some((c) => voids[o].has(suitOf(c))))) break;
+    }
+    out.push(simulateFrom({ hands, hakem, hokm, mode, plays, turn: ctx.turn, played: new Set(played), trickLog: trickLog.slice(), tricks: ctx.tricks }));
+  }
+  return out;
+}
+
+const RAISE_SURE = 0.9; // a bot Hakem only raises when it makes the new reading in about 9 of 10 deals
+const VOTE_ACCEPT_BELOW = 0.9; // a bot opponent says YES unless the Hakem makes the raise in 9 of 10 deals
+
+// A Hakem bot's raise: the highest reading it is nearly sure to make, or 0. Only after two tricks have been played.
+function chooseRaise(ctx) {
+  if (ctx.maxRaise <= ctx.reading || ctx.trickLog.length < 2) return 0;
+  const res = sampleOutcomes(ctx, 60);
+  for (let r = ctx.maxRaise; r > ctx.reading; r--) {
+    if (res.filter((t) => t >= r).length / res.length >= RAISE_SURE) return r;
+  }
+  return 0;
+}
+
+// An opponent bot's answer to a raise. Refusing hands the Hakem their old reading on the spot, accepting risks double
+// the new reading against us, so we accept unless the Hakem is almost certain to make it.
+function chooseVote(ctx) {
+  const res = sampleOutcomes(ctx, 60);
+  return res.filter((t) => t >= ctx.raiseTo).length / res.length < VOTE_ACCEPT_BELOW;
+}
+
+module.exports = { estimateTricks, chooseRaise, chooseVote, sampleOutcomes, chooseBid, chooseBidHeuristic, chooseHakem, chooseDiscards, choosePlay, bestHokm };

@@ -45,6 +45,7 @@ let retry = 0;
 let selected = new Set();
 let pickedHokm = null;
 let pickedContract = null;
+let raiseOpen = false;
 let drawAnim = null;
 let drawTimer = null;
 let lastRound = 0;
@@ -229,6 +230,7 @@ function renderGame() {
   if (S.round !== lastRound) { selected = new Set(); pickedHokm = null; pickedContract = null; lastRound = S.round; }
   if (S.phase !== 'hakem') selected = new Set();
   if (S.phase !== 'hokm') { pickedHokm = null; pickedContract = null; }
+  if (!S.canRaise) raiseOpen = false;
   $('g-code').textContent = S.room;
   renderScore();
   renderTable();
@@ -237,6 +239,8 @@ function renderGame() {
   renderHand();
   renderOverlay();
   if (S.phase === 'play' && (prevPhase === 'hokm' || prevPhase === 'hakem') && S.contract != null) showHokmBanner();
+  if (S.phase === 'raiseVote' && prevPhase !== 'raiseVote') showRaiseBanner('declared');
+  else if (prevPhase === 'raiseVote' && S.phase !== 'raiseVote' && S.lastRaise && S.lastRaise.accepted) showRaiseBanner('accepted');
   prevPhase = S.phase;
 }
 
@@ -255,12 +259,37 @@ function showHokmBanner() {
       h('div', { class: 'rule' }, c.rule),
       h('div', { class: 'by' }, `${nameOf(S.hakem)} plays Sheet`));
   }
+  b.classList.remove('raise');
   b.classList.toggle('long', S.contract !== 'hokm');
   b.classList.add('hidden');
   void b.offsetWidth; // restart the animation
   b.classList.remove('hidden');
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => b.classList.add('hidden'), S.contract === 'hokm' ? 2700 : 3600);
+}
+
+function showRaiseBanner(kind) {
+  const b = $('banner');
+  const r = S.raise || S.lastRaise;
+  if (!r) return;
+  const label = (n) => (n === 13 ? 'ALL' : String(n));
+  if (kind === 'declared') {
+    b.replaceChildren(
+      h('span', { class: 'w' }, 'Raise!'),
+      h('div', { class: 'big-num' }, `${label(r.from)} → ${label(r.to)}`),
+      h('div', { class: 'by' }, `${nameOf(S.hakem)} raises the reading`));
+  } else {
+    b.replaceChildren(
+      h('span', { class: 'w' }, 'Raise accepted'),
+      h('div', { class: 'big-num' }, `${label(r.to)}`),
+      h('div', { class: 'by' }, `${nameOf(S.hakem)} now needs ${label(r.to)} tricks`));
+  }
+  b.classList.add('long', 'raise');
+  b.classList.add('hidden');
+  void b.offsetWidth;
+  b.classList.remove('hidden');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { b.classList.add('hidden'); b.classList.remove('raise'); }, 2800);
 }
 
 function renderScore() {
@@ -314,14 +343,27 @@ function seatPlate(i) {
   } else if (hakemKnown && i === S.hakem) {
     chip = S.reading === 13 ? h('div', { class: 'chip sheet' }, 'SHEET') : h('div', { class: 'chip' }, S.reading);
   }
+  if (S.phase === 'raiseVote' && S.raise) {
+    const lab = (n) => (n === 13 ? 'ALL' : String(n));
+    if (i === S.hakem) chip = h('div', { class: 'chip raise' }, `${lab(S.raise.from)} → ${lab(S.raise.to)}`);
+    else if (S.raise.votes[i] === true) chip = h('div', { class: 'chip yes' }, 'YES');
+    else if (S.raise.votes[i] === false) chip = h('div', { class: 'chip no' }, 'NO');
+    else if (i % 2 !== S.hakem % 2) chip = h('div', { class: 'chip wait' }, '…');
+  }
   const crown = hakemKnown && i === S.hakem ? CROWN() : null;
+  const plus = i === S.you && S.canRaise
+    ? h('button', {
+      class: `plus-btn ${raiseOpen ? 'on' : ''}`, title: 'Raise your reading', 'aria-label': 'Raise your reading',
+      onclick: () => { raiseOpen = !raiseOpen; renderActions(); renderTable(); },
+    }, raiseOpen ? '×' : '+')
+    : null;
 
   const turn = ((S.phase === 'reading' || S.phase === 'play') && S.turn === i) || ((S.phase === 'hakem' || S.phase === 'hokm') && S.hakem === i);
   const backs = rel === 0 ? null : h('div', { class: 'backs' }, Array.from({ length: Math.min(S.counts[i], 16) }, () => h('div', { class: 'back' })));
   return h('div', { class: `seat ${POS[rel]}` },
     backs,
     h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}`, title: crown ? 'Hakem' : null },
-      crown || chip ? h('div', { class: 'over' }, crown, chip) : null,
+      crown || chip || plus ? h('div', { class: 'over' }, crown, chip, plus) : null,
       h('div', { class: 'nm' }, info.name + (i === S.you ? ' (you)' : '')),
       h('div', { class: 'badges' }, badges),
       rel === 0 ? null : h('div', { class: 'cnt' }, `${S.counts[i]} cards`),
@@ -369,7 +411,7 @@ function renderTable() {
     const hk = mineIsHakem ? 'us' : 'them';
     const ok = mineIsHakem ? 'them' : 'us';
     info.append(h('div', { class: 'tricks-box', title: 'The bag counts as a trick for the hakem team' },
-      h('div', {}, `${nameOf(S.hakem)} reads ${need === 13 ? 'Sheet' : need}`),
+      h('div', {}, `${nameOf(S.hakem)} reads ${need === 13 ? (S.originalReading != null ? 'ALL' : 'Sheet') : need}${S.originalReading != null ? ` (raised from ${S.originalReading})` : ''}`),
       h('div', { class: hk }, `${mineIsHakem ? 'Us' : 'Them'} (hakem): ${S.tricks[hteam]} / ${need}`),
       h('div', { class: ok }, `${mineIsHakem ? 'Them' : 'Us'} (bust): ${S.tricks[1 - hteam]} / ${bust}`),
     ));
@@ -430,6 +472,15 @@ function renderStatus() {
         if (COARSE) msg += armed != null ? ' (tap again to play)' : ' (tap a card twice)';
       } else msg = `${nameOf(S.turn)} to play`;
       break;
+    case 'raiseVote': {
+      const r = S.raise;
+      const lab = (n) => (n === 13 ? 'ALL' : n);
+      if (S.canVote) msg = `${nameOf(S.hakem)} wants to raise ${lab(r.from)} → ${lab(r.to)}. Answer YES or NO`;
+      else if (me === S.hakem) msg = 'Waiting for the opponents to answer your raise…';
+      else if (me % 2 !== S.hakem % 2) msg = r.votes[me] === false ? 'You said NO. Waiting for your partner…' : 'Waiting…';
+      else msg = `${nameOf(S.hakem)} raised ${lab(r.from)} → ${lab(r.to)}. The opponents are answering…`;
+      break;
+    }
     case 'trickEnd': msg = `${nameOf(S.trickWinner)} takes the trick`; break;
     default: msg = '';
   }
@@ -439,6 +490,31 @@ function renderStatus() {
 function renderActions() {
   const box = $('actions');
   box.replaceChildren();
+  const lab = (n) => (n === 13 ? 'ALL' : String(n));
+  if (S.phase === 'raiseVote' && S.canVote) {
+    const r = S.raise;
+    box.append(
+      h('div', { class: 'group' },
+        h('button', { class: 'votebtn yes', onclick: () => send({ t: 'vote', yes: true }) }, 'YES'),
+        h('button', { class: 'votebtn no', onclick: () => send({ t: 'vote', yes: false }) }, 'NO')),
+      h('div', { class: 'hint' },
+        `YES: they must now take ${lab(r.to)} and you only need ${14 - r.to} trick${14 - r.to === 1 ? '' : 's'} to bust them (it was ${14 - r.from}). `
+        + `NO from both of you ends the round: ${nameOf(S.hakem)}'s team wins ${lab(r.from)}.`));
+    return;
+  }
+  if (raiseOpen && S.canRaise) {
+    const g = h('div', { class: 'group' }, h('span', { class: 'lab raise-lab' }, 'RAISE TO:'));
+    for (const n of S.raiseOptions) {
+      g.append(h('button', {
+        class: `raisebtn ${n === 13 ? 'all' : ''}`,
+        onclick: () => { raiseOpen = false; send({ t: 'raise', to: n }); },
+      }, lab(n)));
+    }
+    g.append(h('button', { class: 'small', onclick: () => { raiseOpen = false; renderActions(); renderTable(); } }, 'Cancel'));
+    box.append(g, h('div', { class: 'hint' },
+      `The opponents answer YES or NO. One YES and your reading goes up. If both say NO you win your current ${lab(S.reading)} at once. You can raise only once.`));
+    return;
+  }
   if (S.phase === 'reading' && S.turn === S.you) {
     const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, 'Read:'));
     for (let v = 7; v <= 12; v++) g.append(h('button', { class: 'bidbtn', disabled: v <= S.highest, onclick: () => send({ t: 'bid', value: v }) }, v));
@@ -569,9 +645,12 @@ function renderOverlay() {
   const usScored = r.scoringTeam === my;
   const hakemUs = r.hakemTeam === my;
   const reading = r.reading === 13 ? 'Sheet' : r.reading;
-  const headline = r.outcome === 'made'
-    ? `${hakemUs ? 'Your team' : 'Opponents'} made ${reading}`
-    : `${hakemUs ? 'Your team was busted' : 'Opponents busted'} on ${reading}`;
+  const raisedNote = r.raisedFrom != null ? ` (raised from ${r.raisedFrom})` : '';
+  const headline = r.raiseRefused
+    ? `${hakemUs ? 'Your opponents' : 'Your team'} refused the raise to ${r.refusedTo === 13 ? 'ALL' : r.refusedTo}: ${hakemUs ? 'your team wins' : 'Opponents win'} ${reading}`
+    : r.outcome === 'made'
+      ? `${hakemUs ? 'Your team' : 'Opponents'} made ${reading}${raisedNote}`
+      : `${hakemUs ? 'Your team was busted' : 'Opponents busted'} on ${reading}${raisedNote}`;
   const modal = h('div', { class: 'modal' });
   if (S.phase === 'gameOver') {
     const won = S.winner === my;

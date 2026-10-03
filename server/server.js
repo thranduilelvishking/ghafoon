@@ -21,9 +21,11 @@ const TIMING = {
   botHakem: 2200,
   botHokm: 1600,
   botPlay: 750,
+  botVote: 1300,
+  voteMax: 25000,
   roomIdleDelete: 5 * 60 * 1000,
   takeoverAfter: 60 * 1000,
-  ...(process.env.GHAFOON_FAST ? { draw: 50, trickEnd: 20, roundEndMax: 100, botBid: 5, botHakem: 5, botHokm: 5, botPlay: 5 } : {}),
+  ...(process.env.GHAFOON_FAST ? { draw: 50, trickEnd: 20, roundEndMax: 100, botBid: 5, botHakem: 5, botHokm: 5, botPlay: 5, botVote: 5, voteMax: 100 } : {}),
 };
 
 const rooms = new Map();
@@ -175,7 +177,7 @@ class Room {
     const v = { t: 'state', room: this.code, you: me, host: this.hostSeat(), mode: this.mode, seats };
     const g = this.game;
     if (this.mode !== 'game' || !g) return v;
-    const shown = g.phase === 'play' || g.phase === 'trickEnd' || g.phase === 'roundEnd' || g.phase === 'gameOver';
+    const shown = ['play', 'trickEnd', 'roundEnd', 'gameOver', 'raiseVote'].includes(g.phase);
     Object.assign(v, {
       phase: g.phase,
       round: g.round,
@@ -204,6 +206,13 @@ class Room {
       shuffleInfo: g.shuffleInfo,
       ready: [...this.ready],
       winner: g.winner,
+      canRaise: g.canRaise(me),
+      raiseOptions: g.raiseOptions(me),
+      raised: g.raised,
+      originalReading: g.originalReading,
+      raise: g.raise ? { from: g.raise.from, to: g.raise.to, votes: g.raise.votes } : null,
+      canVote: g.phase === 'raiseVote' && g.opponentsOfHakem().includes(me) && g.raise.votes[me] === undefined,
+      lastRaise: g.lastRaise,
     });
     return v;
   }
@@ -263,6 +272,13 @@ class Room {
       case 'play':
         if (this.isBot(g.turn)) this.after(TIMING.botPlay + jitter(), () => this.botStep(phase));
         return;
+      case 'raiseVote': {
+        const pending = g.opponentsOfHakem().filter((x) => g.raise.votes[x] === undefined);
+        if (pending.some((x) => this.isBot(x))) return this.after(TIMING.botVote + jitter(), () => this.botVoteStep(false));
+        // only people left to answer: if they sit on it for too long, answer for them
+        if (pending.length) return this.after(TIMING.voteMax, () => this.botVoteStep(true));
+        return;
+      }
       case 'trickEnd':
         return this.after(TIMING.trickEnd, () => { if (g.phase === 'trickEnd') { g.afterTrick(); this.changed(); } });
       case 'roundEnd':
@@ -281,6 +297,30 @@ class Room {
     if (!g || g.phase !== 'roundEnd') return;
     this.ready.clear();
     g.nextRound();
+    this.changed();
+  }
+
+  // What a bot at `seat` knows when it thinks about a raise (nothing about anyone else's cards).
+  raiseCtx(seat) {
+    const g = this.game;
+    const complete = g.phase === 'trickEnd' || (g.phase === 'raiseVote' && g.raise.resume === 'trickEnd');
+    const played = new Set();
+    for (const t of g.trickLog) for (const p of t.plays) played.add(p.card);
+    return {
+      seat, hand: g.hands[seat], plays: complete ? [] : g.plays, turn: complete ? g.trickWinner : g.turn,
+      hokm: g.hokm, mode: g.mode, hakem: g.hakem, tricks: g.tricks, played, trickLog: g.trickLog,
+      counts: g.hands.map((h) => h.length), bag: seat === g.hakem ? g.bag : [],
+      reading: g.reading, maxRaise: g.maxRaise(),
+    };
+  }
+
+  botVoteStep(force) {
+    const g = this.game;
+    if (!g || g.phase !== 'raiseVote') return;
+    const seat = g.opponentsOfHakem().find((x) => g.raise.votes[x] === undefined && (force || this.isBot(x)));
+    if (seat === undefined) return;
+    const yes = bots.chooseVote({ ...this.raiseCtx(seat), raiseTo: g.raise.to });
+    g.voteRaise(seat, yes);
     this.changed();
   }
 
@@ -305,6 +345,13 @@ class Room {
     } else if (g.phase === 'play') {
       const s = g.turn;
       if (!this.isBot(s)) return;
+      if (s === g.hakem && g.canRaise(s)) {
+        const to = bots.chooseRaise(this.raiseCtx(s));
+        if (to) {
+          g.declareRaise(s, to);
+          return this.changed();
+        }
+      }
       const played = new Set();
       for (const t of g.trickLog) for (const p of t.plays) played.add(p.card);
       for (const p of g.plays) played.add(p.card);
@@ -352,6 +399,14 @@ class Room {
       case 'hokm':
         if (!g) return;
         g.chooseHokm(seat, msg.hokm);
+        return this.changed();
+      case 'raise':
+        if (!g) return;
+        g.declareRaise(seat, msg.to);
+        return this.changed();
+      case 'vote':
+        if (!g) return;
+        g.voteRaise(seat, !!msg.yes);
         return this.changed();
       case 'contract':
         if (!g) return;

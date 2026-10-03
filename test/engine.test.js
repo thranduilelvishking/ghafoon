@@ -401,3 +401,186 @@ test('following suit is mandatory in every contract', () => {
     assert.throws(() => g.play(1, C(H, 2)), /follow suit/);
   }
 });
+
+// ------------------------------------------------------------ the Hakem raises the reading
+
+// seat 0 is Hakem with `reading`, play has started, `tricks` is [hakem team, opponents]
+function raiseGame({ reading = 10, tricks = [1, 0], hakem = 0 } = {}) {
+  const g = toPlay({ reading, hakem, hands: [[C(S, 14), C(S, 2)], [C(S, 13), C(S, 3)], [C(S, 12), C(S, 4)], [C(S, 11), C(S, 5)]], hokm: H });
+  g.tricks = tricks.slice();
+  g.trickLog = [];
+  return g;
+}
+
+test('raise options start above the current reading and stop at what is still reachable', () => {
+  const g = raiseGame({ reading: 10, tricks: [1, 0] });
+  assert.deepStrictEqual(g.raiseOptions(0), [11, 12, 13]);
+  // opponents already hold 2 tricks: 12 would need them to hold fewer than 2, so only 11 is possible
+  g.tricks = [4, 2];
+  assert.deepStrictEqual(g.raiseOptions(0), [11]);
+  assert.throws(() => g.declareRaise(0, 12), /cannot reach/);
+  // 3 tricks for the opponents: 10 already busts at 4, and nothing above 10 is reachable
+  g.tricks = [4, 3];
+  assert.deepStrictEqual(g.raiseOptions(0), []);
+  assert.strictEqual(g.canRaise(0), false);
+});
+
+test('raise options never include the current reading or anything lower', () => {
+  for (const reading of [7, 9, 10, 12]) {
+    const g = raiseGame({ reading, tricks: [1, 0] });
+    for (const o of g.raiseOptions(0)) assert.ok(o > reading);
+    assert.throws(() => g.declareRaise(0, reading), /higher/);
+    assert.throws(() => g.declareRaise(0, reading - 1), /higher/);
+  }
+  assert.deepStrictEqual(raiseGame({ reading: 13, tricks: [1, 0] }).raiseOptions(0), []);
+  assert.deepStrictEqual(raiseGame({ reading: 12, tricks: [1, 0] }).raiseOptions(0), [13]);
+  assert.deepStrictEqual(raiseGame({ reading: 12, tricks: [1, 1] }).raiseOptions(0), []);
+});
+
+test('only the Hakem can raise, and only once, only during play', () => {
+  const g = raiseGame();
+  assert.throws(() => g.declareRaise(1, 11), /only the hakem/);
+  assert.throws(() => g.declareRaise(2, 11), /only the hakem/); // not even the Hakem's partner
+  g.declareRaise(0, 11);
+  assert.strictEqual(g.phase, 'raiseVote');
+  assert.throws(() => g.declareRaise(0, 12), /once|cannot raise/);
+  // no cards can be played while the vote is open
+  assert.throws(() => g.play(0, C(S, 14)), /not play phase/);
+  const r = raiseGame();
+  r.phase = 'reading';
+  assert.throws(() => r.declareRaise(0, 11), /cannot raise/);
+  assert.strictEqual(r.canRaise(0), false);
+});
+
+test('one YES makes the raise stand even if the other opponent says NO', () => {
+  for (const order of [[1, 3], [3, 1]]) {
+    const g = raiseGame({ reading: 10 });
+    g.declareRaise(0, 12);
+    g.voteRaise(order[0], false);
+    assert.strictEqual(g.phase, 'raiseVote'); // still waiting for the other opponent
+    g.voteRaise(order[1], true);
+    assert.strictEqual(g.phase, 'play');
+    assert.strictEqual(g.reading, 12);
+    assert.strictEqual(g.originalReading, 10);
+    assert.deepStrictEqual(g.lastRaise, { from: 10, to: 12, accepted: true });
+  }
+});
+
+test('a YES from either opponent is enough straight away', () => {
+  const g = raiseGame({ reading: 10 });
+  g.declareRaise(0, 11);
+  g.voteRaise(3, true);
+  assert.strictEqual(g.phase, 'play');
+  assert.strictEqual(g.reading, 11);
+  assert.throws(() => g.voteRaise(1, true), /no raise/);
+});
+
+test('both NO: the round ends at once and the Hakem team scores the ORIGINAL reading', () => {
+  const g = raiseGame({ reading: 10, tricks: [3, 1] });
+  g.scores = [5, 5];
+  g.declareRaise(0, 12);
+  g.voteRaise(1, false);
+  assert.strictEqual(g.phase, 'raiseVote');
+  g.voteRaise(3, false);
+  assert.strictEqual(g.phase, 'roundEnd');
+  assert.strictEqual(g.reading, 10);
+  assert.deepStrictEqual(g.scores, [15, 5]);
+  assert.strictEqual(g.roundResult.outcome, 'made');
+  assert.strictEqual(g.roundResult.raiseRefused, true);
+  assert.strictEqual(g.roundResult.refusedTo, 12);
+  assert.strictEqual(g.roundResult.points, 10);
+});
+
+test('only the opponents vote, each once', () => {
+  const g = raiseGame();
+  g.declareRaise(0, 11);
+  assert.throws(() => g.voteRaise(0, true), /only the opponents/);
+  assert.throws(() => g.voteRaise(2, true), /only the opponents/);
+  g.voteRaise(1, false);
+  assert.throws(() => g.voteRaise(1, true), /already/);
+});
+
+test('after an accepted raise the made / bust thresholds follow the new reading', () => {
+  // reading 10 raised to 12: the opponents now bust the Hakem with 14 - 12 = 2 tricks (it was 4)
+  const g = raiseGame({ reading: 10, tricks: [3, 1] });
+  g.declareRaise(0, 12);
+  g.voteRaise(1, true);
+  g.hands = [[C(S, 2)], [C(S, 14)], [C(S, 3)], [C(S, 4)]]; // seat 1 will take this trick: opponents 1 -> 2 tricks
+  g.plays = []; g.turn = 0;
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  assert.strictEqual(g.pendingEnd, 'busted');
+  g.afterTrick();
+  assert.strictEqual(g.roundResult.reading, 12);
+  assert.strictEqual(g.roundResult.raisedFrom, 10);
+  assert.deepStrictEqual(g.scores, [0, 24]); // opponents score twice the raised reading
+});
+
+test('an accepted raise that the Hakem then makes scores the raised reading', () => {
+  const g = raiseGame({ reading: 10, tricks: [10, 0] });
+  g.declareRaise(0, 12);
+  g.voteRaise(3, true);
+  g.tricks = [11, 0];
+  g.hands = [[C(S, 14)], [C(S, 2)], [C(S, 3)], [C(S, 4)]];
+  g.plays = []; g.turn = 0;
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  assert.strictEqual(g.pendingEnd, 'made'); // 12 tricks reached
+  g.afterTrick();
+  assert.deepStrictEqual(g.scores, [12, 0]);
+});
+
+test('raising to ALL (13) turns the round into a sheet for scoring: 26 either way', () => {
+  const g = raiseGame({ reading: 10, tricks: [3, 0] });
+  g.declareRaise(0, 13);
+  g.voteRaise(1, true);
+  assert.strictEqual(g.reading, 13);
+  g.hands = [[C(S, 2)], [C(S, 14)], [C(S, 3)], [C(S, 4)]];
+  g.plays = []; g.turn = 0;
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  g.afterTrick(); // opponents took a trick: bust at 14 - 13 = 1
+  assert.deepStrictEqual(g.scores, [0, 26]);
+});
+
+test('a raise can be made between tricks (during trickEnd) and resumes there', () => {
+  const g = raiseGame({ reading: 8, tricks: [3, 1] });
+  g.hands = [[C(S, 14)], [C(S, 2)], [C(S, 3)], [C(S, 4)]];
+  g.plays = []; g.turn = 0;
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  assert.strictEqual(g.phase, 'trickEnd');
+  assert.strictEqual(g.canRaise(0), true);
+  g.declareRaise(0, 10);
+  g.voteRaise(1, true);
+  assert.strictEqual(g.phase, 'trickEnd');
+  assert.strictEqual(g.reading, 10);
+});
+
+test('no raise once the round is already decided (made or bust pending)', () => {
+  const g = raiseGame({ reading: 8, tricks: [7, 0] });
+  g.hands = [[C(S, 14)], [C(S, 2)], [C(S, 3)], [C(S, 4)]];
+  g.plays = []; g.turn = 0;
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  assert.strictEqual(g.pendingEnd, 'made');
+  assert.strictEqual(g.canRaise(0), false);
+  assert.throws(() => g.declareRaise(0, 9), /cannot raise/);
+});
+
+test('refusing a raise mid-trick still collects all 52 cards for the next shuffle', () => {
+  const g = new E.Game();
+  g.startRound();
+  while (g.phase === 'draw') g.finishDraw();
+  g.bid(g.turn, 7);
+  for (let i = 0; i < 3; i++) g.bid(g.turn, 0);
+  const hakem = g.hakem;
+  g.hakemDiscard(hakem, g.hands[hakem].slice(0, 4));
+  g.chooseContract(hakem, 'hokm', 1);
+  // play two cards of the first trick, then raise and get refused
+  g.play(g.turn, E.legalCards(g.hands[g.turn], g.plays)[0]);
+  g.play(g.turn, E.legalCards(g.hands[g.turn], g.plays)[0]);
+  assert.strictEqual(g.phase, 'play');
+  g.declareRaise(hakem, 8);
+  for (const o of g.opponentsOfHakem()) g.voteRaise(o, false);
+  assert.strictEqual(g.phase, 'roundEnd');
+  assert.strictEqual(new Set(g.pile).size, 52);
+  assert.strictEqual(g.pile.length, 52);
+  g.nextRound(); // and the next round starts fine
+  assert.strictEqual(g.phase, 'reading');
+});

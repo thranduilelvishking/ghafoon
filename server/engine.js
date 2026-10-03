@@ -155,7 +155,7 @@ class Game {
     this.round = 0;
     this.sardast = 0;
     this.pile = null;
-    this.phase = 'idle'; // idle | draw | reading | hakem (discard) | hokm | play | trickEnd | roundEnd | gameOver
+    this.phase = 'idle'; // idle | draw | reading | hakem (discard) | hokm | play | raiseVote | trickEnd | roundEnd | gameOver
     this.winner = null;
     this.roundResult = null;
     this.draw = null;
@@ -207,6 +207,10 @@ class Game {
     this.lastTrick = null;
     this.roundResult = null;
     this.pendingEnd = null;
+    this.raised = false; // the Hakem may raise once per round
+    this.raise = null; // { from, to, votes: {seat: bool}, resume, accepted? }
+    this.lastRaise = null;
+    this.originalReading = null;
     this.phase = this.draw ? 'draw' : 'reading';
   }
 
@@ -300,6 +304,65 @@ class Game {
     this.chooseHokm(seat, hokm);
   }
 
+  // ---- raising the reading
+  // During play the Hakem may raise their reading once, to any higher number up to 13 ("ALL"). The opponents then
+  // answer YES or NO. A single YES makes the raise stand (the bust threshold is recomputed from the new reading). If both
+  // say NO the round ends at once and the Hakem's team wins the original reading.
+  // The Hakem may only raise to a number they could still reach: the opponents must hold fewer than 14 - newReading tricks.
+  maxRaise() {
+    const opp = 1 - teamOf(this.hakem);
+    return Math.min(SHEET, 13 - this.tricks[opp]);
+  }
+
+  canRaise(seat) {
+    return this.hakem !== null && seat === this.hakem && !this.raised &&
+      (this.phase === 'play' || (this.phase === 'trickEnd' && !this.pendingEnd)) &&
+      this.maxRaise() > this.reading;
+  }
+
+  raiseOptions(seat) {
+    const out = [];
+    if (!this.canRaise(seat)) return out;
+    for (let r = this.reading + 1; r <= this.maxRaise(); r++) out.push(r);
+    return out;
+  }
+
+  opponentsOfHakem() {
+    return [0, 1, 2, 3].filter((x) => teamOf(x) !== teamOf(this.hakem));
+  }
+
+  declareRaise(seat, to) {
+    if (seat !== this.hakem) throw new GameError('only the hakem can raise');
+    if (this.raised) throw new GameError('you can only raise once per round');
+    if (!(this.phase === 'play' || (this.phase === 'trickEnd' && !this.pendingEnd))) throw new GameError('you cannot raise right now');
+    if (!Number.isInteger(to) || to <= this.reading) throw new GameError('a raise has to be higher than your reading');
+    if (to > this.maxRaise()) throw new GameError('you cannot reach that: the opponents already have too many tricks');
+    this.raised = true;
+    this.raise = { from: this.reading, to, votes: {}, resume: this.phase };
+    this.phase = 'raiseVote';
+  }
+
+  voteRaise(seat, yes) {
+    if (this.phase !== 'raiseVote') throw new GameError('no raise to answer');
+    const opps = this.opponentsOfHakem();
+    if (!opps.includes(seat)) throw new GameError('only the opponents answer a raise');
+    if (this.raise.votes[seat] !== undefined) throw new GameError('you already answered');
+    this.raise.votes[seat] = !!yes;
+    if (yes) {
+      // one YES is enough: the reading goes up
+      this.originalReading = this.reading;
+      this.reading = this.raise.to;
+      this.raise.accepted = true;
+      this.lastRaise = { from: this.raise.from, to: this.raise.to, accepted: true };
+      this.phase = this.raise.resume;
+    } else if (opps.every((x) => this.raise.votes[x] === false)) {
+      // both refused: the round is over and the Hakem's team wins the original reading
+      this.raise.accepted = false;
+      this.lastRaise = { from: this.raise.from, to: this.raise.to, accepted: false };
+      this.finishRound('made', { refused: true });
+    }
+  }
+
   legalFor(seat) {
     if (this.phase !== 'play' || seat !== this.turn) return [];
     return legalCards(this.hands[seat], this.plays);
@@ -345,7 +408,7 @@ class Game {
     this.phase = 'play';
   }
 
-  finishRound(outcome) {
+  finishRound(outcome, opts = {}) {
     const hakemTeam = teamOf(this.hakem);
     const oppTeam = 1 - hakemTeam;
     const sheet = this.reading === SHEET;
@@ -369,12 +432,16 @@ class Game {
       scoringTeam,
       points,
       tricks: this.tricks.slice(),
+      raisedFrom: this.originalReading,
+      raiseRefused: !!opts.refused,
+      refusedTo: opts.refused && this.raise ? this.raise.to : null,
     };
 
     // Collect the cards for the next shuffle: bag, then the tricks in the order they
     // were played (each trick's 4 cards together), then any cards still in hands.
     const pile = this.bag.slice();
     for (const t of this.trickLog) for (const p of t.plays) pile.push(p.card);
+    for (const p of this.plays) if (!pile.includes(p.card)) pile.push(p.card); // cards on the table if we stop mid-trick
     for (let i = 0, s = this.sardast; i < 4; i++, s = left(s)) pile.push(...this.hands[s]);
     this.pile = pile;
 

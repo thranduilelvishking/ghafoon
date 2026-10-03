@@ -111,3 +111,46 @@ test('no-trump bots: defender wins a trick as soon as it safely can', () => {
   });
   assert.strictEqual(card3, C(S, 4));
 });
+
+// ------------------------------------------------------------ raising
+
+test('bot opponent accepts a raise when the Hakem is nowhere near making it, and a bot Hakem raises only when sure', () => {
+  // seat 0 is the Hakem with hearts as hokm; build a position after 3 tricks in which the opponents hold the
+  // top cards of every suit, so the Hakem team cannot reach 12
+  const trickLog = [0, 1, 2].map((k) => ({
+    plays: [0, 1, 2, 3].map((seat) => ({ seat, card: C(D, 2 + k * 4 + seat) })), winner: 1,
+  }));
+  const played = new Set(trickLog.flatMap((t) => t.plays.map((p) => p.card)));
+  const g = new E.Game(); g.startRound();
+  const hand = [C(S, 2), C(S, 3), C(S, 4), C(K, 2), C(K, 3), C(K, 4), C(H, 2), C(H, 3), C(S, 5)];
+  const ctx = {
+    seat: 1, hand: [C(S, 14), C(S, 13), C(S, 12), C(K, 14), C(K, 13), C(K, 12), C(H, 14), C(H, 13), C(H, 12)],
+    plays: [], turn: 1, hokm: H, mode: 'normal', hakem: 0, tricks: [1, 3], played, trickLog,
+    counts: [9, 9, 9, 9], bag: [], reading: 7, maxRaise: 10, raiseTo: 10,
+  };
+  assert.strictEqual(bots.chooseVote(ctx), true, 'the opponents hold all the top cards, so they should accept');
+  // the Hakem side of the same position: seat 0 holds only low cards and must not raise
+  const weak = { ...ctx, seat: 0, hand, turn: 0, tricks: [1, 3], bag: [C(D, 14), C(D, 13), C(D, 12), C(D, 11)] };
+  assert.strictEqual(bots.chooseRaise(weak), 0);
+});
+
+test('bot Hakem with a position it cannot lose raises to the highest reading it is sure of', () => {
+  // seat 0 holds every top card, the opponents hold nothing but low cards
+  const trickLog = [0, 1].map((k) => ({
+    plays: [0, 1, 2, 3].map((seat) => ({ seat, card: C(D, 2 + k * 4 + seat) })), winner: 0,
+  }));
+  const played = new Set(trickLog.flatMap((t) => t.plays.map((p) => p.card)));
+  const ctx = {
+    seat: 0, hand: [C(S, 14), C(S, 13), C(S, 12), C(S, 11), C(S, 10), C(K, 14), C(K, 13), C(K, 12), C(H, 14), C(H, 13)],
+    plays: [], turn: 0, hokm: H, mode: 'normal', hakem: 0, tricks: [3, 0], played, trickLog,
+    counts: [10, 10, 10, 10], bag: [C(D, 14), C(D, 13), C(D, 12), C(D, 11)], reading: 7, maxRaise: 13,
+  };
+  const to = bots.chooseRaise(ctx);
+  assert.ok(to > 7 && to <= 13, `expected a raise above 7, got ${to}`);
+});
+
+test('chooseRaise never raises before two tricks have been played or when there is nothing to raise to', () => {
+  const base = { seat: 0, hand: [C(S, 14)], plays: [], turn: 0, hokm: H, mode: 'normal', hakem: 0, tricks: [1, 0], played: new Set(), trickLog: [], counts: [1, 1, 1, 1], bag: [], reading: 7, maxRaise: 13 };
+  assert.strictEqual(bots.chooseRaise(base), 0);
+  assert.strictEqual(bots.chooseRaise({ ...base, maxRaise: 7, trickLog: [{ plays: [] }, { plays: [] }] }), 0);
+});
