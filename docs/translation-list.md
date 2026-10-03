@@ -6,14 +6,26 @@
 - `{name}`, `{n}` and similar are values filled in by the game.
 - The Persian is a first draft from me, not a final translation: please correct anything that does not sound like how you actually talk at the table. Rows marked **Unsure** need your word.
 
-## Decisions I need from you
+## Settled by you
 
-1. **The glossary words in section 1**, especially: *reading* (خوانش), *Sheet* (شیت), *Bag* (کیسه), *Yard* (زمین), *Clubs* (گشنیز or خاج), *Team A/B* (تیم الف/ب).
-2. **Card faces:** keep the Latin letters on the cards (A K Q J, as on real decks) in Persian mode, or show آس / شاه / بی‌بی / سرباز?
-3. **Digits:** use Persian digits (۰۱۲۳۴۵۶۷۸۹) for scores, readings and counts in Persian mode, or keep 0–9? (The numbers printed on the cards would stay as they are.)
-4. **Bot names:** keep Arash, Bahar, Cyrus, Dara in Latin letters, or show them in Persian script (آرش، بهار، کوروش، دارا) in Persian mode?
-5. **Tone:** I used the neutral polite form ("نوبت شماست", "بزنید"). Is that right, or do you want a friendlier, informal tone ("نوبتته", "بزن")?
-6. **Which language first:** should the game start in English or in Persian, or follow the phone/browser language?
+- Reading: «امیر ۱۰ دست خواند» (the verb, with *دست*) · Yard = وسط · Bag = زمین · Discard = خواباندن · Sheet = شیت
+- Naras / Saras / Tak-Naras = نرس / سرس / تک نرس · Clubs = گشنیز · Us / Them = ما / رقیب (and Opponents = رقبا)
+
+## Still open (my recommended answer in brackets)
+
+1. **Spelling of "discard":** you wrote «خوابندن». The standard spelling is **خواباندن** (spoken: خوابوندن). I used خواباندن. [keep]
+2. **The "raise" word:** you said the Hakem "adds". Do you say **اضافه کردن** (add) or **افزایش** (raise) or **بالا بردن**? I used افزایش. [your call]
+3. **"Bust" (Hakem fails):** I used **سوختن** ("تیم شما روی ۱۰ سوخت"). Is that the word, or something else? [please check]
+4. **"Made" (Hakem reaches the number):** I used **را برد** ("تیم شما ۱۰ را برد"). Or "به ۱۰ رسید"? [please check]
+5. **The number a player called**, as a noun (used in "with one YES your … goes up"): I wrote **عدد** (number). Or "خوانده"? [عدد]
+6. **Dealer:** پخش‌کننده, or پخش‌کن? [keep]
+7. **"Your lead":** «شما شروع کنید» or «دست با شماست»? [شما شروع کنید]
+8. **Cut the deck:** کات or برش? [کات]
+9. **Card faces:** keep A K Q J on the cards in Persian mode, or آس / شاه / بی‌بی / سرباز? [keep A K Q J, like real decks]
+10. **Digits:** Persian digits (۰۱۲۳…) for scores and counts, or 0–9? [Persian digits; the cards keep their printed numbers]
+11. **Bot names:** keep Arash, Bahar, Cyrus, Dara in Latin letters, or Persian script in Persian mode? [Persian script in Persian mode]
+12. **Tone:** neutral polite ("نوبت شماست") or informal ("نوبتته")? [neutral polite]
+13. **Starting language:** English, Persian, or follow the phone? [follow the phone, switchable]
 
 ## How it would work
 
@@ -32,23 +44,23 @@ These words appear everywhere, so they decide the feel of the whole translation.
 | Hakem | حاکم |  |
 | Hokm (trump suit) | حکم |  |
 | Dealer | پخش‌کننده | Or the English-style "دیلر"? |
-| Reading (the bid) / "to read" | خوانش / خواندن | **Unsure.** How do you say "I read 10" in Persian? e.g. "می~خوانم ۱۰"? |
+| Reading (the bid) / "to read" | خواندن | **Confirmed**: «امیر ۱۰ دست خواند» |
 | Pass | پاس |  |
-| Sheet (13) | شیت | **Unsure.** Or another word for taking everything? |
+| Sheet (13) | شیت | **Confirmed**: like the English "sheet" |
 | Trick (one set of 4 cards) | دست | Also what people call a "hand" |
-| Bag (the Hakem's 4 discarded cards) | کیسه | **Unsure.** What do you call it? |
-| Yard (the 4 cards set aside) | زمین | **Unsure.** What do you call it? (appears rarely in the UI) |
-| Discard (button) | دور انداختن |  |
+| Bag (the Hakem's 4 discarded cards) | زمین | **Confirmed** |
+| Yard (the 4 cards set aside) | وسط | **Confirmed** |
+| Discard (button) | خواباندن | **Confirmed** (see question 1: spelling) |
 | Boridan / SarBor | بریدن / سربُر | Not shown anywhere in the UI today, listed for completeness |
 | Raise (the new rule) | افزایش | Banner "RAISE!" → «افزایش!» |
 | ALL (raise to 13) | همه |  |
 | YES / NO | بله / نه | Or the more casual آره / نه? |
-| Naras | نارس |  |
-| Saras | سارس |  |
-| Tak-Naras | تک‌نارس |  |
-| Team A / Team B | تیم الف / تیم ب | Or "تیم A / تیم B"? |
-| Us / Them | ما / آن‌ها |  |
-| Opponents | حریفان | Or رقبا? |
+| Naras | نرس | **Confirmed** |
+| Saras | سرس | **Confirmed** |
+| Tak-Naras | تک نرس | **Confirmed** |
+| Team A / Team B | تیم الف / تیم ب |  |
+| Us / Them | ما / رقیب | **Confirmed** |
+| Opponents | رقبا | Follows "رقیب" |
 | Partner | هم‌تیمی | Or the borrowed "پارتنر"? |
 | Host | میزبان |  |
 | Room | اتاق |  |
@@ -60,7 +72,7 @@ These words appear everywhere, so they decide the feel of the whole translation.
 | Score / points | امتیاز |  |
 | Spades | پیک |  |
 | Hearts | دل |  |
-| Clubs | گشنیز | Or خاج? |
+| Clubs | گشنیز | **Confirmed** |
 | Diamonds | خشت |  |
 
 ## 2. Home screen
@@ -127,15 +139,15 @@ These words appear everywhere, so they decide the feel of the whole translation.
 | SHEET (chip) | شیت |  |
 | ALL (chip) | همه |  |
 | Hokm (info box label) | حکم |  |
-| {name} reads {n} | {name} {n} خواند | Depends on the word for "reading" |
+| {name} reads {n} | {name} {n} دست خواند | Depends on the word for "reading" |
 | (raised from {n}) | (افزایش از {n}) |  |
 | Us (hakem): {a} / {n} | ما (حاکم): {a} از {n} |  |
-| Them (bust): {a} / {n} | آن‌ها (شکست حاکم): {a} از {n} |  |
-| The bag counts as a trick for the hakem team (tooltip) | کیسه برای تیم حاکم یک دست حساب می‌شود |  |
+| Them (bust): {a} / {n} | رقیب (سوختن حاکم): {a} از {n} |  |
+| The bag counts as a trick for the hakem team (tooltip) | زمین برای تیم حاکم یک دست حساب می‌شود |  |
 | Stacks kept, cut {n}× | دست‌ها روی هم مانده، {n} بار کات شد |  |
 | Last trick | دست قبلی |  |
 | Hakem (tooltip on the crown) | حاکم |  |
-| Raise your reading (tooltip on the + button) | افزایش خوانش |  |
+| Raise your reading (tooltip on the + button) | افزایش |  |
 
 ## 5. Status line (the yellow text under the table)
 
@@ -145,13 +157,13 @@ These words appear everywhere, so they decide the feel of the whole translation.
 | {name} gets the first Ace and reads first | {name} اولین آس را گرفت و اول می‌خواند |  |
 | Your turn to read | نوبت شما برای خواندن است |  |
 | {name} is reading… | {name} در حال خواندن است… |  |
-| You are the Hakem with {n}: pick 4 cards for the bag, then press Discard | شما حاکم هستید با {n}: ۴ کارت برای کیسه انتخاب کنید و «دور انداختن» را بزنید |  |
-| (forced 7) | (۷ اجباری) |  |
-| {name} is picking the bag… | {name} در حال انتخاب کیسه است… |  |
+| You are the Hakem with {n}: pick 4 cards for the bag, then press Discard | شما با {n} دست حاکم شدید: ۴ کارت برای زمین انتخاب کنید و «خواباندن» را بزنید |  |
+| (forced 7) | (۷ دست اجباری) |  |
+| {name} is picking the bag… | {name} در حال خواباندن زمین است… |  |
 | Now pick the Hokm suit and press Hokm | حالا خال حکم را انتخاب کنید و «حکم» را بزنید |  |
-| Sheet! Choose how to play: Hokm, Naras, Saras or Tak-Naras | شیت! نوع بازی را انتخاب کنید: حکم، نارس، سارس یا تک‌نارس |  |
+| Sheet! Choose how to play: Hokm, Naras, Saras or Tak-Naras | شیت! نوع بازی را انتخاب کنید: حکم، نرس، سرس یا تک نرس |  |
 | {name} is choosing Hokm… | {name} در حال انتخاب حکم است… |  |
-| {name} is choosing: Hokm, Naras, Saras or Tak-Naras… | {name} در حال انتخاب است: حکم، نارس، سارس یا تک‌نارس… |  |
+| {name} is choosing: Hokm, Naras, Saras or Tak-Naras… | {name} در حال انتخاب است: حکم، نرس، سرس یا تک نرس… |  |
 | {Contract}: {short rule}. (play phase reminder) | {Contract}: {short rule}. |  |
 | Your lead: play any card | شروع با شماست: هر کارتی بازی کنید |  |
 | Your turn: follow {suit} if you can | نوبت شماست: اگر دارید از {suit} بازی کنید |  |
@@ -165,19 +177,19 @@ These words appear everywhere, so they decide the feel of the whole translation.
 
 | English | Persian (draft) | Note |
 |---|---|---|
-| Read: | خواندن: |  |
+| Read: | بخوانید: |  |
 | Pass (button) | پاس |  |
 | Sheet (button) | شیت |  |
-| Bag: {n} / 4 cards | کیسه: {n} از ۴ کارت |  |
-| Discard (button) | دور انداختن |  |
+| Bag: {n} / 4 cards | زمین: {n} از ۴ کارت |  |
+| Discard (button) | خواباندن | **Confirmed** (see question 1: spelling) |
 | Hokm suit: | خال حکم: |  |
 | Hokm (confirm button) | حکم |  |
 | Choose | انتخاب |  |
-| Play {contract} | بازی {contract} | e.g. «بازی نارس» |
-| Hokm — rule: Trump suit: name one suit as Hokm. | حکم: یک خال را به عنوان حکم (برنده) اعلام کنید. |  |
-| Saras — rule: No trump. The highest card of the led suit wins. | سارس: بدون حکم. بالاترین کارت از خال زمین‌شده می‌برد. |  |
-| Naras — rule: No trump. The lowest card of the led suit wins (Ace is high, so it loses). | نارس: بدون حکم. پایین‌ترین کارت از خال زمین‌شده می‌برد (آس بالاترین است، پس می‌بازد). |  |
-| Tak-Naras — rule: No trump. The lowest card wins and the Ace counts as 1, so the Ace wins. | تک‌نارس: بدون حکم. پایین‌ترین کارت می‌برد و آس یک حساب می‌شود، پس آس می‌برد. |  |
+| Play {contract} | بازی {contract} | e.g. «بازی نرس» |
+| Hokm — rule: Trump suit: name one suit as Hokm. | حکم: یک خال را به عنوان حکم اعلام کنید. |  |
+| Saras — rule: No trump. The highest card of the led suit wins. | سرس: بدون حکم. بالاترین کارت از خال زمین‌شده می‌برد. |  |
+| Naras — rule: No trump. The lowest card of the led suit wins (Ace is high, so it loses). | نرس: بدون حکم. پایین‌ترین کارت از خال زمین‌شده می‌برد (آس بالاترین است، پس می‌بازد). |  |
+| Tak-Naras — rule: No trump. The lowest card wins and the Ace counts as 1, so the Ace wins. | تک نرس: بدون حکم. پایین‌ترین کارت می‌برد و آس یک حساب می‌شود، پس آس می‌برد. |  |
 | Short rules: highest wins / lowest wins / lowest wins, Ace = 1 | بالاترین می‌برد / پایین‌ترین می‌برد / پایین‌ترین می‌برد، آس = ۱ |  |
 
 ## 7. Raising the reading
@@ -186,13 +198,13 @@ These words appear everywhere, so they decide the feel of the whole translation.
 |---|---|---|
 | RAISE TO: | افزایش به: |  |
 | Cancel | لغو |  |
-| The opponents answer YES or NO. One YES and your reading goes up. If both say NO you win your current {n} at once. You can raise only once. | حریفان بله یا نه می‌گویند. با یک «بله» خوانش شما بالا می‌رود. اگر هر دو «نه» بگویند، همان {n} فعلی را همین حالا می‌برید. فقط یک بار می‌توانید افزایش دهید. |  |
+| The opponents answer YES or NO. One YES and your reading goes up. If both say NO you win your current {n} at once. You can raise only once. | رقبا بله یا نه می‌گویند. با یک «بله» عدد شما بالا می‌رود. اگر هر دو «نه» بگویند، همان {n} دست فعلی را همین حالا می‌برید. فقط یک بار می‌توانید افزایش دهید. |  |
 | {name} wants to raise {a} → {b}. Answer YES or NO | {name} می‌خواهد از {a} به {b} افزایش دهد. بله یا نه؟ | Arrows in right-to-left text can look flipped: check on screen |
 | YES / NO (buttons) | بله / نه |  |
-| YES: they must now take {b} and you only need {n} trick(s) to bust them (it was {m}). NO from both of you ends the round: {name}'s team wins {a}. | بله: آن‌ها حالا باید {b} دست ببرند و شما فقط {n} دست لازم دارید تا آن‌ها را بسوزانید (قبلاً {m} بود). اگر هر دوی شما «نه» بگویید، دور تمام می‌شود و تیم {name} {a} امتیاز می‌برد. | "بسوزانید" = bust; is there a better word for this? |
-| Waiting for the opponents to answer your raise… | منتظر پاسخ حریفان به افزایش شما… |  |
+| YES: they must now take {b} and you only need {n} trick(s) to bust them (it was {m}). NO from both of you ends the round: {name}'s team wins {a}. | بله: حاکم حالا باید {b} دست ببرد و شما فقط {n} دست لازم دارید تا او را بسوزانید (قبلاً {m} بود). اگر هر دوی شما «نه» بگویید، دور تمام می‌شود و تیم {name} {a} امتیاز می‌برد. | "بسوزانید" = bust; is there a better word for this? |
+| Waiting for the opponents to answer your raise… | منتظر پاسخ رقبا به افزایش شما… |  |
 | You said NO. Waiting for your partner… | شما «نه» گفتید. منتظر هم‌تیمی‌تان… |  |
-| {name} raised {a} → {b}. The opponents are answering… | {name} از {a} به {b} افزایش داد. حریفان در حال پاسخ دادن هستند… |  |
+| {name} raised {a} → {b}. The opponents are answering… | {name} از {a} به {b} افزایش داد. رقبا در حال پاسخ دادن هستند… |  |
 | YES / NO (chips on the name bubbles) | بله / نه |  |
 
 ## 8. Banners (the big announcements)
@@ -203,7 +215,7 @@ These words appear everywhere, so they decide the feel of the whole translation.
 | {name} named {suit} | {name} {suit} را حکم کرد |  |
 | {name} plays Sheet | {name} شیت بازی می‌کند |  |
 | Raise! | افزایش! |  |
-| {name} raises the reading | {name} خوانش را افزایش داد |  |
+| {name} raises the reading | {name} افزایش داد |  |
 | Raise accepted | افزایش پذیرفته شد |  |
 | {name} now needs {n} tricks | {name} حالا باید {n} دست ببرد |  |
 
@@ -213,14 +225,14 @@ These words appear everywhere, so they decide the feel of the whole translation.
 |---|---|---|
 | Round {n} | دور {n} |  |
 | Your team made {n} | تیم شما {n} را برد | "made" = reached the reading |
-| Opponents made {n} | حریفان {n} را بردند |  |
+| Opponents made {n} | رقبا {n} را بردند |  |
 | Your team was busted on {n} | تیم شما روی {n} سوخت |  |
-| Opponents busted on {n} | حریفان روی {n} سوختند |  |
+| Opponents busted on {n} | رقبا روی {n} سوختند |  |
 | (raised from {n}) | (افزایش از {n}) |  |
-| Your opponents refused the raise to {n}: your team wins {m} | حریفان افزایش به {n} را رد کردند: تیم شما {m} امتیاز می‌برد |  |
-| Your team refused the raise to {n}: Opponents win {m} (the other variant, when your team is the opponents) | تیم شما افزایش به {n} را رد کرد: حریفان {m} امتیاز می‌برند | |
+| Your opponents refused the raise to {n}: your team wins {m} | رقبا افزایش به {n} را رد کردند: تیم شما {m} امتیاز می‌برد |  |
+| Your team refused the raise to {n}: Opponents win {m} (the other variant, when your team is the opponents) | تیم شما افزایش به {n} را رد کرد: رقبا {m} امتیاز می‌برند | |
 | ({name} was Hakem) | ({name} حاکم بود) |  |
-| Tricks: us {a}, them {b} (bag included) | دست‌ها: ما {a}، آن‌ها {b} (با کیسه) |  |
+| Tricks: us {a}, them {b} (bag included) | دست‌ها: ما {a}، رقیب {b} (با زمین) |  |
 | Us / Them (scores) | ما / آن‌ها |  |
 | Next round | دور بعد |  |
 | Waiting for others… | منتظر بقیه… |  |
@@ -228,7 +240,7 @@ These words appear everywhere, so they decide the feel of the whole translation.
 | 🏆 You win! | 🏆 شما بردید! |  |
 | You lose | شما باختید |  |
 | Your team reached 104 first. | تیم شما اول به ۱۰۴ رسید. |  |
-| The opponents reached 104 first. | حریفان اول به ۱۰۴ رسیدند. |  |
+| The opponents reached 104 first. | رقبا اول به ۱۰۴ رسیدند. |  |
 | Back to lobby | بازگشت به سالن انتظار |  |
 | Leave room | خروج از اتاق |  |
 
@@ -261,17 +273,17 @@ These come from the game engine as English sentences. For Persian they would be 
 | you must follow suit | باید از همان خال بازی کنید |  |
 | not your turn | نوبت شما نیست |  |
 | card not in hand | این کارت در دست شما نیست |  |
-| reading must be higher than the current highest | خوانش باید از بالاترین خوانش فعلی بیشتر باشد |  |
-| discard exactly 4 cards | دقیقاً ۴ کارت دور بیندازید |  |
-| discard first, then choose how to play | اول دور بیندازید، بعد نوع بازی را انتخاب کنید |  |
+| reading must be higher than the current highest | باید بیشتر از بالاترین دستِ خوانده‌شده بخوانید |  |
+| discard exactly 4 cards | دقیقاً ۴ کارت بخوابانید |  |
+| discard first, then choose how to play | اول بخوابانید، بعد نوع بازی را انتخاب کنید |  |
 | only a Sheet can be played without Hokm | فقط شیت را می‌شود بدون حکم بازی کرد |  |
 | you are not the hakem | شما حاکم نیستید |  |
 | only the hakem can raise | فقط حاکم می‌تواند افزایش دهد |  |
 | you can only raise once per round | در هر دور فقط یک بار می‌شود افزایش داد |  |
-| a raise has to be higher than your reading | افزایش باید از خوانش شما بیشتر باشد |  |
-| you cannot reach that: the opponents already have too many tricks | به آن نمی‌رسید: حریفان از قبل دست‌های زیادی برده‌اند |  |
+| a raise has to be higher than your reading | افزایش باید بیشتر از دست‌هایی باشد که خواندید |  |
+| you cannot reach that: the opponents already have too many tricks | به آن نمی‌رسید: رقبا از قبل دست‌های زیادی برده‌اند |  |
 | you cannot raise right now | الان نمی‌توانید افزایش دهید |  |
-| only the opponents answer a raise | فقط حریفان به افزایش پاسخ می‌دهند |  |
+| only the opponents answer a raise | فقط رقبا به افزایش پاسخ می‌دهند |  |
 | you already answered | شما قبلاً پاسخ داده‌اید |  |
 | no raise to answer / that request is no longer open | افزایشی برای پاسخ دادن نیست / این درخواست دیگر باز نیست |  |
 | only the host can start the game | فقط میزبان می‌تواند بازی را شروع کند |  |
