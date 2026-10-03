@@ -22,7 +22,7 @@ function playBotRound(g, stats) {
     }
     const s = g.turn;
     const card = bots.choosePlay({
-      seat: s, hand: g.hands[s], plays: g.plays, hokm: g.hokm, hakem: g.hakem,
+      seat: s, hand: g.hands[s], plays: g.plays, hokm: g.hokm, mode: g.mode, hakem: g.hakem,
       reading: g.reading, tricks: g.tricks, played, trickLog: g.trickLog,
     });
     g.play(s, card);

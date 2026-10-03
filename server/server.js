@@ -189,6 +189,8 @@ class Room {
       highest: g.highest,
       turn: g.turn,
       hokm: shown ? g.hokm : null,
+      contract: shown ? g.contract : null,
+      trickMode: g.mode,
       hand: g.hands[me],
       counts: g.hands.map((h) => h.length),
       legal: g.legalFor(me),
@@ -307,7 +309,7 @@ class Room {
       for (const t of g.trickLog) for (const p of t.plays) played.add(p.card);
       for (const p of g.plays) played.add(p.card);
       const card = bots.choosePlay({
-        seat: s, hand: g.hands[s], plays: g.plays, hokm: g.hokm, hakem: g.hakem,
+        seat: s, hand: g.hands[s], plays: g.plays, hokm: g.hokm, mode: g.mode, hakem: g.hakem,
         reading: g.reading, tricks: g.tricks, played, trickLog: g.trickLog,
       });
       g.play(s, card);
@@ -350,6 +352,10 @@ class Room {
       case 'hokm':
         if (!g) return;
         g.chooseHokm(seat, msg.hokm);
+        return this.changed();
+      case 'contract':
+        if (!g) return;
+        g.chooseContract(seat, msg.contract, msg.hokm);
         return this.changed();
       case 'play':
         if (!g) return;

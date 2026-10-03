@@ -8,7 +8,14 @@ const suitOf = (c) => (c / 13) | 0;
 const rankOf = (c) => (c % 13) + 2;
 const RANK_LABEL = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' };
 const rankLabel = (r) => RANK_LABEL[r] || String(r);
-const POS = ['p0', 'p1', 'p2', 'p3']; // relative to me: bottom, left, top, right
+const POS = ['p0', 'p1', 'p2', 'p3'];
+const CONTRACT_INFO = {
+  hokm: { label: 'Hokm', rule: 'Trump suit: name one suit as Hokm.' },
+  saras: { label: 'Saras', rule: 'No trump. The highest card of the led suit wins.' },
+  naras: { label: 'Naras', rule: 'No trump. The lowest card of the led suit wins (Ace is high, so it loses).' },
+  taknaras: { label: 'Tak-Naras', rule: 'No trump. The lowest card wins and the Ace counts as 1, so the Ace wins.' },
+};
+const SHORT_RULE = { saras: 'highest wins', naras: 'lowest wins', taknaras: 'lowest wins, Ace = 1' }; // relative to me: bottom, left, top, right
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,6 +44,7 @@ let pendingJoin = null;
 let retry = 0;
 let selected = new Set();
 let pickedHokm = null;
+let pickedContract = null;
 let drawAnim = null;
 let drawTimer = null;
 let lastRound = 0;
@@ -218,9 +226,9 @@ function cardEl(c, cls = '') {
 let prevPhase = null;
 
 function renderGame() {
-  if (S.round !== lastRound) { selected = new Set(); pickedHokm = null; lastRound = S.round; }
+  if (S.round !== lastRound) { selected = new Set(); pickedHokm = null; pickedContract = null; lastRound = S.round; }
   if (S.phase !== 'hakem') selected = new Set();
-  if (S.phase !== 'hokm') pickedHokm = null;
+  if (S.phase !== 'hokm') { pickedHokm = null; pickedContract = null; }
   $('g-code').textContent = S.room;
   renderScore();
   renderTable();
@@ -228,22 +236,31 @@ function renderGame() {
   renderActions();
   renderHand();
   renderOverlay();
-  if (S.phase === 'play' && (prevPhase === 'hokm' || prevPhase === 'hakem') && S.hokm != null) showHokmBanner();
+  if (S.phase === 'play' && (prevPhase === 'hokm' || prevPhase === 'hakem') && S.contract != null) showHokmBanner();
   prevPhase = S.phase;
 }
 
 let bannerTimer = null;
 function showHokmBanner() {
   const b = $('banner');
-  b.replaceChildren(
-    h('span', { class: 'w' }, 'Hokm'),
-    h('span', { class: `s ${isRed(S.hokm) ? 'red' : ''}` }, SUITS[S.hokm]),
-    h('div', { class: 'by' }, `${nameOf(S.hakem)} named ${SUIT_NAMES[S.hokm]}`));
+  if (S.contract === 'hokm') {
+    b.replaceChildren(
+      h('span', { class: 'w' }, 'Hokm'),
+      h('span', { class: `s ${isRed(S.hokm) ? 'red' : ''}` }, SUITS[S.hokm]),
+      h('div', { class: 'by' }, `${nameOf(S.hakem)} named ${SUIT_NAMES[S.hokm]}`));
+  } else {
+    const c = CONTRACT_INFO[S.contract];
+    b.replaceChildren(
+      h('span', { class: 'w' }, c.label),
+      h('div', { class: 'rule' }, c.rule),
+      h('div', { class: 'by' }, `${nameOf(S.hakem)} plays Sheet`));
+  }
+  b.classList.toggle('long', S.contract !== 'hokm');
   b.classList.add('hidden');
   void b.offsetWidth; // restart the animation
   b.classList.remove('hidden');
   clearTimeout(bannerTimer);
-  bannerTimer = setTimeout(() => b.classList.add('hidden'), 2700);
+  bannerTimer = setTimeout(() => b.classList.add('hidden'), S.contract === 'hokm' ? 2700 : 3600);
 }
 
 function renderScore() {
@@ -335,10 +352,14 @@ function renderTable() {
   // info panel
   const info = $('info');
   info.replaceChildren();
-  if (S.hokm != null) {
+  if (S.contract === 'hokm') {
     info.append(h('div', { class: 'hokm-box' },
       h('div', { class: 'lab' }, 'Hokm'),
       h('div', { class: `big ${isRed(S.hokm) ? 'red' : ''}` }, `${SUITS[S.hokm]} ${SUIT_NAMES[S.hokm]}`)));
+  } else if (S.contract) {
+    info.append(h('div', { class: 'hokm-box', title: CONTRACT_INFO[S.contract].rule },
+      h('div', { class: 'lab' }, SHORT_RULE[S.contract]),
+      h('div', { class: 'big' }, CONTRACT_INFO[S.contract].label)));
   }
   if (S.hakem != null && S.reading && S.phase !== 'reading' && S.phase !== 'draw') {
     const hteam = S.hakem % 2;
@@ -353,7 +374,7 @@ function renderTable() {
       h('div', { class: ok }, `${mineIsHakem ? 'Them' : 'Us'} (bust): ${S.tricks[1 - hteam]} / ${bust}`),
     ));
   } else if (S.round > 1 && S.shuffleInfo && S.shuffleInfo.kind === 'stacked' && S.phase === 'reading') {
-    info.append(h('div', { class: 'tricks-box' }, `Stacks kept, cut ${S.shuffleInfo.cuts}×`));
+    info.append(h('div', { class: 'tricks-box' }, `Stacks kept, light shuffle, cut ${S.shuffleInfo.cuts}×`));
   }
 
   const last = $('last');
@@ -384,6 +405,7 @@ function stopDrawTimer() { clearInterval(drawTimer); drawTimer = null; }
 function renderStatus() {
   const me = S.you;
   let msg = '';
+  let msg0 = '';
   switch (S.phase) {
     case 'draw':
       msg = drawAnim && S.draw && drawAnim.round === S.round && drawAnim.done
@@ -397,9 +419,12 @@ function renderStatus() {
         : `${nameOf(S.hakem)} is picking the bag…`;
       break;
     case 'hokm':
-      msg = S.hakem === me ? 'Now pick the Hokm suit and press Hokm' : `${nameOf(S.hakem)} is choosing Hokm…`;
+      msg = S.hakem === me
+        ? (S.reading === 13 ? 'Sheet! Choose how to play: Hokm, Naras, Saras or Tak-Naras' : 'Now pick the Hokm suit and press Hokm')
+        : (S.reading === 13 ? `${nameOf(S.hakem)} is choosing: Hokm, Naras, Saras or Tak-Naras…` : `${nameOf(S.hakem)} is choosing Hokm…`);
       break;
     case 'play':
+      if (S.contract && S.contract !== 'hokm') msg0 = `${CONTRACT_INFO[S.contract].label}: ${SHORT_RULE[S.contract]}. `;
       if (S.turn === me) {
         msg = S.plays.length ? `Your turn: follow ${SUIT_NAMES[suitOf(S.plays[0].card)]} if you can` : 'Your lead: play any card';
         if (COARSE) msg += armed != null ? ' (tap again to play)' : ' (tap a card twice)';
@@ -408,7 +433,7 @@ function renderStatus() {
     case 'trickEnd': msg = `${nameOf(S.trickWinner)} takes the trick`; break;
     default: msg = '';
   }
-  $('status').textContent = msg;
+  $('status').textContent = msg0 + msg;
 }
 
 function renderActions() {
@@ -425,16 +450,38 @@ function renderActions() {
       h('span', { class: 'lab' }, `Bag: ${selected.size} / 4 cards`),
       h('button', { class: 'primary', disabled: selected.size !== 4, onclick: () => send({ t: 'discard', discards: [...selected] }) }, 'Discard')));
   } else if (S.phase === 'hokm' && S.hakem === S.you) {
-    const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, 'Hokm:'));
-    for (let s = 0; s < 4; s++) {
-      g.append(h('button', {
-        class: `suitbtn ${isRed(s) ? 'red' : ''} ${pickedHokm === s ? 'on' : ''}`,
-        title: SUIT_NAMES[s],
-        onclick: () => { pickedHokm = s; renderActions(); },
-      }, SUITS[s]));
+    const sheet = S.reading === 13;
+    if (!sheet) pickedContract = 'hokm';
+    const suitRow = () => {
+      const g = h('div', { class: 'group' }, h('span', { class: 'lab' }, 'Hokm suit:'));
+      for (let s = 0; s < 4; s++) {
+        g.append(h('button', {
+          class: `suitbtn ${isRed(s) ? 'red' : ''} ${pickedHokm === s ? 'on' : ''}`,
+          title: SUIT_NAMES[s],
+          onclick: () => { pickedHokm = s; renderActions(); },
+        }, SUITS[s]));
+      }
+      return g;
+    };
+    if (sheet) {
+      const g = h('div', { class: 'group' });
+      for (const key of ['hokm', 'naras', 'saras', 'taknaras']) {
+        g.append(h('button', {
+          class: `cbtn ${pickedContract === key ? 'on' : ''}`,
+          onclick: () => { pickedContract = key; renderActions(); },
+        }, CONTRACT_INFO[key].label));
+      }
+      box.append(g);
     }
-    g.append(h('button', { class: 'primary', disabled: pickedHokm == null, onclick: () => send({ t: 'hokm', hokm: pickedHokm }) }, 'Hokm'));
-    box.append(g);
+    if (pickedContract === 'hokm') box.append(suitRow());
+    const ready = pickedContract != null && (pickedContract !== 'hokm' || pickedHokm != null);
+    const label = pickedContract ? CONTRACT_INFO[pickedContract].label : 'Choose';
+    const go = h('button', {
+      class: 'primary', disabled: !ready,
+      onclick: () => send({ t: 'contract', contract: pickedContract, hokm: pickedContract === 'hokm' ? pickedHokm : undefined }),
+    }, sheet ? `Play ${label}` : 'Hokm');
+    box.append(go);
+    if (sheet && pickedContract) box.append(h('div', { class: 'hint' }, CONTRACT_INFO[pickedContract].rule));
   }
 }
 

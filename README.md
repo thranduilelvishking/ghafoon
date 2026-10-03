@@ -21,11 +21,25 @@ Open the page, pick **Quick play** (you + 3 bots) or **Create a room** and share
 - `public/`: the client (vanilla JS, no build step).
 - `test/`: rules/shuffle tests, bot-only self-play, and WebSocket integration tests.
 
+## Sheet contracts
+
+After a Sheet (13) the Hakem discards 4 cards and then picks how the round is played:
+
+- **Hokm**: one suit is trump (Boridan / SarBor as usual).
+- **Saras**: no trump, the highest card of the led suit wins.
+- **Naras**: no trump, the lowest card of the led suit wins (Ace is high, so it is the worst card).
+- **Tak-Naras**: like Naras, but the Ace counts as 1, so the Ace is the best card.
+
+In every contract following suit is mandatory and only a card of the led suit (or a Hokm card) can win a trick,
+so a 2 of clubs never beats a 3 of spades that was led. The Hakem must still take all 13 tricks (the bag counts as
+one): 26 points if they do, 26 to the opponents if they lose a single trick. Readings below Sheet are always Hokm.
+
 ## Shuffling
 
 The first round of a game gets a full Fisher-Yates shuffle (after the "first Ace" draw that picks the Sardast).
 Every later round does **not** re-randomise the cards. The previous round's cards are collected as they
 fell: the bag, then each trick's four cards stacked on the one before it, then any cards left in hands.
-That pile is only cut once or twice at arbitrary positions (a break can land mid-trick) and dealt in the
-rule's packets (12 to the Sardast, 1 to the yard, and so on). Nothing inspects or steers the resulting hands;
+That pile gets a light overhand-style disturbance (it breaks about 20% of the links between neighbouring cards,
+`MIX_LINKS` in `server/engine.js`; 0 keeps the stacks fully intact), is cut once or twice at arbitrary positions
+(a break can land mid-trick) and is dealt in the rule's packets (12 to the Sardast, 1 to the yard, and so on). Nothing inspects or steers the resulting hands;
 the long suits and voids simply come from the stacks.

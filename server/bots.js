@@ -1,7 +1,7 @@
 'use strict';
 // Bot players. They see only what a human at their seat would see.
 
-const { suitOf, rankOf, legalCards, trickWinner, partner, teamOf, SHEET } = require('./engine');
+const { suitOf, rankOf, legalCards, trickWinner, cardStrength, partner, teamOf, SHEET } = require('./engine');
 
 const ACE = 14;
 const KING = 13;
@@ -119,8 +119,61 @@ function knownVoids(trickLog, plays) {
   return voids;
 }
 
+// Play for the Sheet contracts without a trump suit (saras / naras / tak-naras).
+// The bidder must take every trick, so the other team only needs one: both sides just try to win tricks
+// safely, using the contract's own card order (cardStrength) and a count of the cards still unseen.
+function noTrumpPlay(ctx) {
+  const { seat, hand, plays, played } = ctx;
+  const mode = ctx.mode || 'normal';
+  const legal = legalCards(hand, plays);
+  if (legal.length === 1) return legal[0];
+
+  const str = (c) => cardStrength(c, mode);
+  const mine = new Set(hand);
+  const higherUnseen = (card) => {
+    const s = suitOf(card);
+    let n = 0;
+    for (let r = 2; r <= ACE; r++) {
+      const c = s * 13 + (r - 2);
+      if (!mine.has(c) && !played.has(c) && str(c) > str(card)) n++;
+    }
+    return n;
+  };
+  const weakest = (cards) => cards.reduce((a, b) => (str(a) <= str(b) ? a : b));
+  const strongest = (cards) => cards.reduce((a, b) => (str(a) >= str(b) ? a : b));
+
+  if (!plays.length) {
+    // lead the card that is hardest to beat
+    return legal.reduce((a, b) => {
+      const ha = higherUnseen(a);
+      const hb = higherUnseen(b);
+      if (ha !== hb) return ha < hb ? a : b;
+      return str(a) >= str(b) ? a : b;
+    });
+  }
+
+  const led = suitOf(plays[0].card);
+  if (suitOf(legal[0]) !== led) return weakest(legal); // cannot win this trick: keep the strong cards
+  const winnerSeat = trickWinner(plays, null, mode);
+  const winnerCard = plays.find((p) => p.seat === winnerSeat).card;
+  const lastToPlay = plays.length === 3;
+  const partnerWinning = winnerSeat === partner(seat);
+  const beats = (c) => trickWinner([...plays, { seat, card: c }], null, mode) === seat;
+
+  if (partnerWinning && (lastToPlay || higherUnseen(winnerCard) === 0)) return weakest(legal);
+  const winners = legal.filter(beats);
+  if (winners.length) {
+    if (lastToPlay) return weakest(winners);
+    const safe = winners.filter((c) => higherUnseen(c) === 0);
+    if (safe.length) return weakest(safe);
+    return strongest(winners); // others still to play: make our win as hard to beat as possible
+  }
+  return weakest(legal);
+}
+
 // ctx: { seat, hand, plays, hokm, hakem, reading, tricks, played:Set, trickLog? }
 function choosePlay(ctx) {
+  if (ctx.hokm == null) return noTrumpPlay(ctx);
   const { seat, hand, plays, hokm, played } = ctx;
   const legal = legalCards(hand, plays);
   if (legal.length === 1) return legal[0];

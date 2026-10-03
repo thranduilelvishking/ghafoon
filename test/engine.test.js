@@ -217,8 +217,9 @@ test('stacked shuffle keeps every card, does only 1-2 cuts', () => {
   }
 });
 
-test('stacked shuffle preserves the pile order apart from the breaks', () => {
+test('stacked shuffle preserves the pile order apart from the light overhand and the cuts', () => {
   const pile = E.fullShuffle();
+  const broken = Math.round(E.MIX_LINKS * 51);
   for (let i = 0; i < 200; i++) {
     const { deck, cuts } = E.stackedShuffle(pile);
     let adjacent = 0; // adjacent pairs of the pile that are still adjacent
@@ -226,7 +227,17 @@ test('stacked shuffle preserves the pile order apart from the breaks', () => {
       const at = pile.indexOf(deck[j]);
       if (pile[(at + 1) % 52] === deck[j + 1]) adjacent++;
     }
-    // a cyclic rotation keeps 51 pairs per cut region boundary: at most 2 cuts break 2 links
+    assert.ok(adjacent >= 51 - broken - cuts, `adjacent ${adjacent}`);
+    assert.ok(adjacent <= 51 - broken + 2, `adjacent ${adjacent}: the overhand should break about ${broken} links`);
+  }
+});
+
+test('with mix 0 only the cuts disturb the pile', () => {
+  const pile = E.fullShuffle();
+  for (let i = 0; i < 100; i++) {
+    const { deck, cuts } = E.stackedShuffle(pile, undefined, 0);
+    let adjacent = 0;
+    for (let j = 0; j < 51; j++) if (pile[(pile.indexOf(deck[j]) + 1) % 52] === deck[j + 1]) adjacent++;
     assert.ok(adjacent >= 51 - cuts, `adjacent ${adjacent}`);
   }
 });
@@ -288,4 +299,105 @@ test('hakem flow is two steps: discard first (bag), then name hokm', () => {
   assert.strictEqual(g.phase, 'play');
   assert.strictEqual(g.hokm, K);
   assert.strictEqual(g.turn, 1); // sardast leads
+});
+
+// ------------------------------------------------------------ Sheet contracts: Saras / Naras / Tak-Naras
+
+const T = (...cards) => cards.map((card, i) => ({ seat: i, card }));
+
+test('saras: no trump, highest card of the led suit wins, off-suit never wins', () => {
+  // hearts are NOT trump here, so the 2 of hearts cannot take a spade trick
+  assert.strictEqual(E.trickWinner(T(C(S, 5), C(H, 14), C(S, 9), C(S, 7)), null), 2);
+  assert.strictEqual(E.trickWinner(T(C(S, 14), C(S, 13), C(K, 14), C(S, 2)), null), 0);
+});
+
+test('naras: lowest card of the led suit wins; Ace is high so it loses', () => {
+  assert.strictEqual(E.trickWinner(T(C(S, 9), C(S, 3), C(S, 14), C(S, 12)), null, 'naras'), 1);
+  assert.strictEqual(E.trickWinner(T(C(S, 14), C(S, 13), C(S, 12), C(S, 11)), null, 'naras'), 3); // Ace is worst
+  assert.strictEqual(E.trickWinner(T(C(S, 2), C(S, 3), C(S, 4), C(S, 5)), null, 'naras'), 0); // the 2 is best
+});
+
+test('naras: following suit still decides everything (a 2 of clubs cannot beat a 3 of spades)', () => {
+  assert.strictEqual(E.trickWinner(T(C(S, 3), C(K, 2), C(S, 8), C(D, 2)), null, 'naras'), 0);
+});
+
+test('tak-naras: Ace counts as 1, so it is the best card; then 2, 3 ... King is worst', () => {
+  assert.strictEqual(E.trickWinner(T(C(S, 9), C(S, 3), C(S, 14), C(S, 2)), null, 'taknaras'), 2);
+  assert.strictEqual(E.trickWinner(T(C(S, 13), C(S, 12), C(S, 11), C(S, 10)), null, 'taknaras'), 3);
+  assert.strictEqual(E.trickWinner(T(C(S, 2), C(S, 14), C(K, 14), C(D, 14)), null, 'taknaras'), 1);
+});
+
+test('hokm still works the old way when a hokm is given', () => {
+  assert.strictEqual(E.trickWinner(T(C(S, 14), C(H, 2), C(S, 13), C(H, 3)), H), 3);
+});
+
+function sheetGame(sardast = 0) {
+  const hand = Array.from({ length: 12 }, (_, i) => i);
+  const g = setup({ sardast, hands: [[], [], [], []].map((_, i) => (i === sardast ? hand : [])), yard: [20, 21, 22, 23] });
+  g.bid(sardast, 13);
+  g.hakemDiscard(sardast, [0, 1, 2, 3]);
+  return g;
+}
+
+test('sheet: hakem can choose hokm, saras, naras or tak-naras', () => {
+  for (const [contract, mode, hokm] of [['hokm', 'normal', 2], ['saras', 'normal', null], ['naras', 'naras', null], ['taknaras', 'taknaras', null]]) {
+    const g = sheetGame();
+    g.chooseContract(0, contract, contract === 'hokm' ? 2 : undefined);
+    assert.strictEqual(g.phase, 'play');
+    assert.strictEqual(g.contract, contract);
+    assert.strictEqual(g.mode, mode);
+    assert.strictEqual(g.hokm, hokm);
+    assert.strictEqual(g.leader, 0); // the hakem leads a sheet
+    assert.strictEqual(g.reading, 13);
+  }
+});
+
+test('contract validation: hokm needs a suit; only a sheet may skip hokm; bad names refused', () => {
+  const g = sheetGame();
+  assert.throws(() => g.chooseContract(0, 'hokm'));
+  assert.throws(() => g.chooseContract(0, 'hokm', 7));
+  assert.throws(() => g.chooseContract(0, 'banana'));
+  assert.throws(() => g.chooseContract(1, 'naras'), /not the hakem|you are not/);
+  // a non-sheet reading cannot go without hokm
+  const hand = Array.from({ length: 12 }, (_, i) => i);
+  const g2 = setup({ sardast: 0, hands: [hand, [], [], []], yard: [20, 21, 22, 23] });
+  g2.bid(0, 12); g2.bid(1, 0); g2.bid(2, 0); g2.bid(3, 0);
+  g2.hakemDiscard(0, [0, 1, 2, 3]);
+  for (const c of ['saras', 'naras', 'taknaras']) assert.throws(() => g2.chooseContract(0, c), /only a Sheet/);
+  g2.chooseContract(0, 'hokm', 1);
+  assert.strictEqual(g2.phase, 'play');
+});
+
+test('naras sheet: opponents winning a single trick busts the hakem for 26', () => {
+  const g = sheetGame();
+  g.chooseContract(0, 'naras');
+  // set up a trick: the hakem leads the 9 of spades, opponent seat 1 answers with the 4 (lower, so it wins)
+  g.hands = [[C(S, 9)], [C(S, 4)], [C(S, 7)], [C(S, 8)]];
+  g.tricks = [1, 0];
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  assert.strictEqual(g.trickWinner, 1);
+  g.afterTrick();
+  assert.strictEqual(g.roundResult.contract, 'naras');
+  assert.deepStrictEqual(g.scores, [0, 26]);
+});
+
+test('tak-naras sheet made: scores 26 for the hakem team', () => {
+  const g = sheetGame();
+  g.chooseContract(0, 'taknaras');
+  g.hands = [[C(S, 14)], [C(S, 13)], [C(S, 12)], [C(S, 11)]]; // the Ace is the best card
+  g.tricks = [12, 0];
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  assert.strictEqual(g.trickWinner, 0);
+  g.afterTrick();
+  assert.deepStrictEqual(g.scores, [26, 0]);
+});
+
+test('following suit is mandatory in every contract', () => {
+  for (const contract of ['saras', 'naras', 'taknaras']) {
+    const g = sheetGame();
+    g.chooseContract(0, contract);
+    g.hands = [[C(S, 9)], [C(S, 4), C(H, 2)], [C(S, 7)], [C(S, 8)]];
+    g.play(0, C(S, 9));
+    assert.throws(() => g.play(1, C(H, 2)), /follow suit/);
+  }
 });

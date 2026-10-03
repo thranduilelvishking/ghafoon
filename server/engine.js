@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const SUITS = ['S', 'H', 'C', 'D'];
 const WIN_SCORE = 104;
 const SHEET = 13;
+const CONTRACTS = ['hokm', 'saras', 'naras', 'taknaras'];
 
 const suitOf = (c) => (c / 13) | 0;
 const rankOf = (c) => (c % 13) + 2;
@@ -36,15 +37,32 @@ function fullShuffle(deck = freshDeck(), rand = randInt) {
   return d;
 }
 
-// Shuffle used between rounds. The pile coming in is the previous round's cards
-// in the order they were collected: the bag, then each trick stacked on top of the
-// last, then whatever was left in hands. We do NOT riffle or randomise it. We only
-// cut the pile one or two times, at arbitrary positions (so a break may land
-// in the middle of a trick). Whatever hands come out of the deal are whatever the
-// stacks and breaks produce; nothing evaluates or steers them.
-function stackedShuffle(pile, rand = randInt) {
+// How much a light overhand-style disturbance breaks up the previous round's stacks, as the fraction of the
+// 51 links between neighbouring cards that get broken. 0 keeps the stacks completely intact (apart from the cuts);
+// 1 would be roughly a full shuffle. Tricks mostly stay together at 0.2: packets average about 5 cards.
+const MIX_LINKS = 0.2;
+
+// Takes the deck apart at `links * 51` random places and puts the packets back in reverse order,
+// each packet keeping its own order: what an overhand shuffle does.
+function lightOverhand(deck, links, rand) {
+  const n = deck.length;
+  const want = Math.min(n - 1, Math.round(links * (n - 1)));
+  const breaks = new Set();
+  while (breaks.size < want) breaks.add(1 + rand(n - 1));
+  const cuts = [0, ...[...breaks].sort((a, b) => a - b), n];
+  const packets = [];
+  for (let i = 0; i < cuts.length - 1; i++) packets.push(deck.slice(cuts[i], cuts[i + 1]));
+  return packets.reverse().flat();
+}
+
+// Shuffle used between rounds. The pile coming in is the previous round's cards in the order they were
+// collected: the bag, then each trick stacked on top of the last, then whatever was left in hands.
+// We do NOT riffle or randomise it. We give it a light overhand shuffle (MIX_LINKS) and then cut it one or
+// two times at arbitrary positions (so a break may land in the middle of a trick). Whatever hands come out
+// of the deal are whatever the stacks and breaks produce; nothing evaluates or steers them.
+function stackedShuffle(pile, rand = randInt, mix = MIX_LINKS) {
   if (pile.length !== 52) throw new Error('pile must have 52 cards');
-  let d = pile.slice();
+  let d = mix > 0 ? lightOverhand(pile, mix, rand) : pile.slice();
   const cuts = 1 + rand(2); // 1 or 2 breaks
   for (let i = 0; i < cuts; i++) {
     const at = 8 + rand(37); // keep cuts away from the very ends of the pile
@@ -85,15 +103,29 @@ function deal(deck, sardast) {
 
 // ---------------------------------------------------------------- trick logic
 
-function trickWinner(plays, hokm) {
+// How strong a card is for winning a trick of its suit.
+//   normal:   2 < 3 < ... < K < A
+//   naras:    the lowest card wins, with Ace counted as 14 (so the Ace is the worst card and the 2 the best)
+//   taknaras: the lowest card wins, with Ace counted as 1 (so the Ace is the best card)
+function cardStrength(card, mode = 'normal') {
+  const r = rankOf(card);
+  if (mode === 'naras') return -r;
+  if (mode === 'taknaras') return -(r === 14 ? 1 : r);
+  return r;
+}
+
+// hokm: trump suit, or null when there is none (Saras / Naras / Tak-Naras).
+// Only a card of the led suit (or a Hokm card) can ever win: an off-suit card never does, however low or high.
+function trickWinner(plays, hokm, mode = 'normal') {
   const ledSuit = suitOf(plays[0].card);
+  const trump = hokm == null ? -1 : hokm;
   let best = plays[0];
   for (const p of plays.slice(1)) {
     const ps = suitOf(p.card);
     const bs = suitOf(best.card);
-    if (ps === hokm) {
-      if (bs !== hokm || rankOf(p.card) > rankOf(best.card)) best = p;
-    } else if (bs !== hokm && ps === ledSuit && rankOf(p.card) > rankOf(best.card)) {
+    if (ps === trump) {
+      if (bs !== trump || cardStrength(p.card) > cardStrength(best.card)) best = p;
+    } else if (bs !== trump && ps === ledSuit && cardStrength(p.card, mode) > cardStrength(best.card, mode)) {
       best = p;
     }
   }
@@ -112,8 +144,9 @@ function legalCards(hand, plays) {
 class GameError extends Error {}
 
 class Game {
-  constructor({ rand = randInt } = {}) {
+  constructor({ rand = randInt, mix = MIX_LINKS } = {}) {
     this.rand = rand;
+    this.mix = mix;
     this.reset();
   }
 
@@ -146,7 +179,7 @@ class Game {
       deck = fullShuffle(freshDeck(), this.rand);
       this.shuffleInfo = { kind: 'full' };
     } else {
-      const s = stackedShuffle(this.pile, this.rand);
+      const s = stackedShuffle(this.pile, this.rand, this.mix);
       deck = s.deck;
       this.shuffleInfo = { kind: 'stacked', cuts: s.cuts };
     }
@@ -164,6 +197,8 @@ class Game {
     this.reading = 0;
     this.forced = false;
     this.hokm = null;
+    this.contract = null; // hokm | saras | naras | taknaras
+    this.mode = 'normal';
     this.bag = [];
     this.tricks = [0, 0];
     this.trickLog = [];
@@ -229,16 +264,33 @@ class Game {
     this.phase = 'hokm';
   }
 
-  // Step 2: the Hakem names Hokm and play begins.
-  chooseHokm(seat, hokm) {
-    if (this.phase !== 'hokm') throw new GameError('discard first, then name Hokm');
+  // Step 2: the Hakem names the contract and play begins.
+  // A normal reading is always played with a Hokm suit. A Sheet may instead be played as
+  //   saras:    no trump, highest card of the led suit wins
+  //   naras:    no trump, lowest card of the led suit wins (Ace is high, so it is the worst card)
+  //   taknaras: no trump, lowest wins, with Ace counted as 1 (so the Ace is the best card)
+  // Following suit stays mandatory in all of them. The Hakem still has to take every trick.
+  chooseContract(seat, contract, hokm = null) {
+    if (this.phase !== 'hokm') throw new GameError('discard first, then choose how to play');
     if (seat !== this.hakem) throw new GameError('you are not the hakem');
-    if (!Number.isInteger(hokm) || hokm < 0 || hokm > 3) throw new GameError('bad hokm');
+    if (!CONTRACTS.includes(contract)) throw new GameError('bad contract');
+    if (contract === 'hokm') {
+      if (!Number.isInteger(hokm) || hokm < 0 || hokm > 3) throw new GameError('bad hokm');
+    } else {
+      if (this.reading !== SHEET) throw new GameError('only a Sheet can be played without Hokm');
+      hokm = null;
+    }
+    this.contract = contract;
     this.hokm = hokm;
+    this.mode = contract === 'naras' || contract === 'taknaras' ? contract : 'normal';
     this.leader = this.reading === SHEET ? this.hakem : this.sardast;
     this.turn = this.leader;
     this.plays = [];
     this.phase = 'play';
+  }
+
+  chooseHokm(seat, hokm) {
+    this.chooseContract(seat, 'hokm', hokm);
   }
 
   // Both steps at once (used by bots' self-play and tests).
@@ -264,7 +316,7 @@ class Game {
       this.turn = left(seat);
       return;
     }
-    const winner = trickWinner(this.plays, this.hokm);
+    const winner = trickWinner(this.plays, this.hokm, this.mode);
     const team = teamOf(winner);
     this.tricks[team]++;
     this.lastTrick = { plays: this.plays.slice(), winner };
@@ -310,6 +362,7 @@ class Game {
     this.roundResult = {
       outcome,
       hakem: this.hakem,
+      contract: this.contract,
       hakemTeam,
       reading: this.reading,
       forced: !!this.forced,
@@ -345,6 +398,6 @@ class Game {
 module.exports = {
   SUITS, WIN_SCORE, SHEET,
   suitOf, rankOf, makeCard, left, right, partner, teamOf,
-  freshDeck, fullShuffle, stackedShuffle, firstAceDraw, deal,
-  trickWinner, legalCards, Game, GameError,
+  MIX_LINKS, freshDeck, fullShuffle, stackedShuffle, firstAceDraw, deal,
+  cardStrength, CONTRACTS, trickWinner, legalCards, Game, GameError,
 };

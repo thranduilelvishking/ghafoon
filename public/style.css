@@ -159,6 +159,8 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .banner .w { font-size: clamp(30px, 6vw, 56px); font-weight: 800; letter-spacing: 6px; text-transform: uppercase; }
 .banner .s { font-size: clamp(54px, 11vw, 104px); line-height: 1; color: var(--ink); }
 .banner .s.red { color: #ff5a70; }
+.banner.long { flex-direction: column; gap: 4px; padding: 14px 40px 26px; text-align: center; max-width: 92%; }
+.banner .rule { font-size: clamp(13px, 2vw, 18px); color: var(--ink); max-width: 460px; }
 .banner .by { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 12px; color: var(--muted); letter-spacing: 1px; }
 .banner.hidden { display: none; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
@@ -169,6 +171,9 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .actions .group { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; }
 .actions .lab { color: var(--muted); font-size: 13px; }
 .bidbtn { min-width: 44px; }
+.cbtn { padding: 10px 16px; font-weight: 600; }
+.cbtn.on { background: var(--accent); color: #231c05; border-color: var(--accent); }
+.actions .hint { flex-basis: 100%; text-align: center; color: var(--muted); font-size: 13px; }
 .suitbtn { font-size: 20px; padding: 4px 12px; line-height: 1.2; }
 .suitbtn.red { color: #ff6a7d; }
 .suitbtn.on { background: var(--accent); color: #231c05; border-color: var(--accent); }
