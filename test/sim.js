@@ -8,7 +8,7 @@ function playBotRound(g, stats) {
   while (g.phase === 'draw') g.finishDraw();
   while (g.phase === 'reading') {
     const s = g.turn;
-    g.bid(s, bots.chooseBid(g.hands[s], g.highest));
+    g.bid(s, bots.chooseBid(g.hands[s], g.highest, { seat: s, sardast: g.sardast }));
   }
   const { hokm, discards } = bots.chooseHakem(g.hands[g.hakem]);
   g.hakemDone(g.hakem, discards, hokm);

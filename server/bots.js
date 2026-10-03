@@ -83,14 +83,75 @@ function bestHokm(hand) {
 
 // ---------------------------------------------------------------- reading
 
-const BID_MARGIN = 0.0;
-
-function chooseBid(hand, highest) {
+// The old rule of thumb: own expected tricks plus fixed allowances for the bag, partner and yard.
+// Kept as a fallback (and for comparison in tests).
+function chooseBidHeuristic(hand, highest) {
   const { est } = bestHokm(hand);
-  // +1 for the bag, ~2.7 expected from the partner, a bit for the extra yard cards.
-  const total = est + 1 + 2.7 + 0.5 - BID_MARGIN;
+  const total = est + 1 + 2.7 + 0.5;
   let value = Math.floor(total);
   if (value >= SHEET) value = 12; // bots never gamble on a sheet
+  if (value < 7 || value <= highest) return 0;
+  return value;
+}
+
+// How a person actually reads a hand: "I can't guarantee 8, but the four yard cards, the bag and my partner
+// will probably get me there, so I'll risk 10." The bot deals the unseen cards out at random many times
+// (a random partner, random opponents, a random 4-card yard), takes the yard, bags its worst four cards and names
+// its best suit exactly as it would for real, plays the round out, and bids the highest reading it made in
+// at least `risk` of those deals. Nothing here peeks at anyone's real cards.
+const BID_RISK = 0.5; // 0.5 = bid what it makes about half the time; lower is bolder, higher is safer
+const BID_SAMPLES = 70;
+
+function simulateHakemTricks(hands, hakem, hokm, leader) {
+  const played = new Set();
+  const trickLog = [];
+  const counts = [0, 0];
+  counts[teamOf(hakem)] = 1; // the bag
+  let lead = leader;
+  for (let t = 0; t < 12; t++) {
+    const plays = [];
+    let seat = lead;
+    for (let k = 0; k < 4; k++) {
+      const hand = hands[seat];
+      const card = choosePlay({ seat, hand, plays, hokm, mode: 'normal', hakem, reading: 0, tricks: counts, played, trickLog });
+      hands[seat] = hand.filter((c) => c !== card);
+      plays.push({ seat, card });
+      seat = (seat + 1) % 4;
+    }
+    const winner = trickWinner(plays, hokm);
+    counts[teamOf(winner)]++;
+    plays.forEach((p) => played.add(p.card));
+    trickLog.push({ plays, winner });
+    lead = winner;
+  }
+  return counts[teamOf(hakem)];
+}
+
+function chooseBid(hand, highest, ctx) {
+  if (!ctx || ctx.seat == null || ctx.sardast == null) return chooseBidHeuristic(hand, highest);
+  const { seat, sardast } = ctx;
+  const risk = ctx.risk != null ? ctx.risk : BID_RISK;
+  const samples = ctx.samples || BID_SAMPLES;
+  const mine = new Set(hand);
+  const unseen = [];
+  for (let c = 0; c < 52; c++) if (!mine.has(c)) unseen.push(c);
+  const made = new Array(14).fill(0); // made[r] = deals in which the team took at least r tricks
+  for (let n = 0; n < samples; n++) {
+    for (let i = unseen.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [unseen[i], unseen[j]] = [unseen[j], unseen[i]];
+    }
+    const yard = unseen.slice(0, 4);
+    const hands = [null, null, null, null];
+    hands[seat] = hand.concat(yard);
+    for (let k = 1; k <= 3; k++) hands[(seat + k) % 4] = unseen.slice(4 + (k - 1) * 12, 4 + k * 12);
+    const { hokm, discards } = chooseHakem(hands[seat]);
+    hands[seat] = hands[seat].filter((c) => !discards.includes(c));
+    const tricks = simulateHakemTricks(hands, seat, hokm, sardast);
+    for (let r = 7; r <= tricks && r <= 12; r++) made[r]++;
+  }
+  let value = 0;
+  for (let r = 7; r <= 12; r++) if (made[r] / samples >= risk) value = r;
   if (value < 7 || value <= highest) return 0;
   return value;
 }
@@ -314,4 +375,4 @@ function trumpsOutside(ctx, suit) {
   return false;
 }
 
-module.exports = { estimateTricks, chooseBid, chooseHakem, chooseDiscards, choosePlay, bestHokm };
+module.exports = { estimateTricks, chooseBid, chooseBidHeuristic, chooseHakem, chooseDiscards, choosePlay, bestHokm };

@@ -290,7 +290,7 @@ class Room {
     if (g.phase === 'reading') {
       const s = g.turn;
       if (!this.isBot(s)) return;
-      g.bid(s, bots.chooseBid(g.hands[s], g.highest));
+      g.bid(s, bots.chooseBid(g.hands[s], g.highest, { seat: s, sardast: g.sardast }));
     } else if (g.phase === 'hakem') {
       const s = g.hakem;
       if (!this.isBot(s)) return;
