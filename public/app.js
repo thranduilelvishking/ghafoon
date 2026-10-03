@@ -226,6 +226,7 @@ function seatPlate(i) {
       h('div', { class: 'nm' }, info.name + (i === S.you ? ' (you)' : '')),
       h('div', { class: 'badges' }, badges),
       h('div', { class: 'bid' }, bid),
+      rel === 0 ? null : h('div', { class: 'cnt' }, `${S.counts[i]} cards`),
     ),
   );
 }
@@ -314,6 +315,7 @@ function renderStatus() {
     case 'play':
       if (S.turn === me) {
         msg = S.plays.length ? `Your turn: follow ${SUIT_NAMES[suitOf(S.plays[0].card)]} if you can` : 'Your lead: play any card';
+        if (COARSE) msg += armed != null ? ' (tap again to play)' : ' (tap a card twice)';
       } else msg = `${nameOf(S.turn)} to play`;
       break;
     case 'trickEnd': msg = `${nameOf(S.trickWinner)} takes the trick`; break;
@@ -348,18 +350,20 @@ function renderActions() {
   }
 }
 
+const COARSE = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+let armed = null; // touch screens: first tap raises a card, second tap plays it
+const SUIT_GAP = 6;
+
 function renderHand() {
   const box = $('hand');
   const picking = S.phase === 'hakem' && S.hakem === S.you;
   const myTurn = S.phase === 'play' && S.turn === S.you;
   const legal = new Set(S.legal || []);
+  if (!myTurn || !(S.hand || []).includes(armed)) armed = null;
   box.classList.toggle('pick', picking);
   const cards = (S.hand || []).slice().sort((a, b) => suitOf(a) - suitOf(b) || rankOf(b) - rankOf(a));
-  let prevSuit = -1;
-  box.replaceChildren(...cards.map((c) => {
+  const els = cards.map((c, idx) => {
     const cls = [];
-    if (suitOf(c) !== prevSuit && prevSuit !== -1) cls.push('gap');
-    prevSuit = suitOf(c);
     let onclick = null;
     if (picking) {
       if (selected.has(c)) cls.push('sel');
@@ -370,12 +374,56 @@ function renderHand() {
         renderActions();
       };
     } else if (myTurn) {
-      if (legal.has(c)) { cls.push('legal'); onclick = () => send({ t: 'play', card: c }); } else cls.push('dim');
+      if (legal.has(c)) {
+        cls.push('legal');
+        if (armed === c) cls.push('sel');
+        onclick = () => {
+          if (COARSE && armed !== c) { armed = c; renderHand(); renderStatus(); } else { armed = null; send({ t: 'play', card: c }); }
+        };
+      } else cls.push('dim');
     }
     const el = cardEl(c, cls.join(' '));
+    el.dataset.gap = idx > 0 && suitOf(c) !== suitOf(cards[idx - 1]) ? '1' : '';
     if (onclick) el.addEventListener('click', onclick);
     return el;
-  }));
+  });
+  layoutHand(box, els);
+}
+
+// Lay the hand out in one row, or two when 16 cards would be squeezed too tightly to tap.
+function layoutHand(box, els) {
+  box.replaceChildren();
+  if (!els.length) return;
+  const row1 = h('div', { class: 'hrow' }, els);
+  box.append(row1);
+  const cw = els[0].getBoundingClientRect().width || 50;
+  const avail = box.clientWidth - 12;
+  const maxStep = cw * 0.72;
+  const stepFor = (list) => {
+    const gaps = list.filter((e) => e.dataset.gap).length * SUIT_GAP;
+    return list.length > 1 ? (avail - cw - gaps) / (list.length - 1) : maxStep;
+  };
+  const apply = (list) => {
+    const step = Math.min(maxStep, stepFor(list));
+    list.forEach((e, i) => { e.style.marginLeft = i === 0 ? '0' : `${step - cw + (e.dataset.gap ? SUIT_GAP : 0)}px`; });
+  };
+  if (els.length > 9 && stepFor(els) < cw * 0.55) {
+    // split near the middle, preferring a suit boundary
+    let mid = Math.ceil(els.length / 2);
+    for (let d = 0; d <= 3; d++) {
+      const k = [mid - d, mid + d].find((x) => x > 2 && x < els.length - 2 && els[x].dataset.gap);
+      if (k) { mid = k; break; }
+    }
+    const a = els.slice(0, mid);
+    const b = els.slice(mid);
+    row1.replaceChildren(...a);
+    box.append(h('div', { class: 'hrow' }, b));
+    box.classList.add('two');
+    [a, b].forEach((list) => { list[0].dataset.gap = ''; apply(list); });
+  } else {
+    box.classList.remove('two');
+    apply(els);
+  }
 }
 
 function renderOverlay() {
@@ -414,6 +462,24 @@ function renderOverlay() {
   ov.replaceChildren(modal);
   ov.classList.remove('hidden');
 }
+
+// ------------------------------------------------------------- phones: orientation, sleep, wake lock
+
+window.addEventListener('resize', () => { if (S && S.mode === 'game') renderHand(); });
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if (!('wakeLock' in navigator) || wakeLock || !S || S.mode !== 'game') return;
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (session && (!ws || ws.readyState > 1)) connect(); // phones suspend sockets in the background
+  keepAwake();
+});
+document.addEventListener('pointerdown', keepAwake, { passive: true });
 
 // ------------------------------------------------------------- boot
 

@@ -1,0 +1,14 @@
+{
+  "name": "Ghafoon",
+  "short_name": "Ghafoon",
+  "description": "Four-player Ghafoon card game",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1a17",
+  "theme_color": "#0f1a17",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
