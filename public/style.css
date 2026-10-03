@@ -73,7 +73,7 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .scoreboard .us .big { color: var(--us); } .scoreboard .them .big { color: var(--them); }
 .scoreboard .goal { font-size: 12px; color: var(--muted); }
 
-.table { position: relative; flex: 1; min-height: 150px; border-radius: 26px; background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 100%); border: 3px solid #0a2a20; box-shadow: inset 0 0 60px #0006; }
+.table { container-type: size; position: relative; flex: 1; min-height: 150px; border-radius: 26px; background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 100%); border: 3px solid #0a2a20; box-shadow: inset 0 0 60px #0006; }
 .seat { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .seat.p0 { bottom: 6px; left: 50%; transform: translateX(-50%); }
 .seat.p1 { left: 10px; top: 56%; transform: translateY(-50%); }
@@ -106,11 +106,12 @@ button.small { padding: 6px 10px; font-size: 13px; }
 
 .center { position: absolute; inset: 0; pointer-events: none; }
 /* played cards: a tight cross in the middle of the table (top / left / right / bottom = that player's side) */
-.slot { position: absolute; left: 50%; top: calc(50% + var(--cy, 50px)); }
-.slot.p2 { transform: translate(-50%, calc(-100% + var(--ch) * .1)); }
-.slot.p0 { transform: translate(-50%, calc(var(--ch) * -.1)); }
-.slot.p1 { transform: translate(calc(-100% - var(--cw) * .6), -50%); }
-.slot.p3 { transform: translate(calc(var(--cw) * .6), -50%); }
+.slot { --scw: var(--cw); position: absolute; left: 50%; top: calc(50% + (var(--top-off, 0px) + var(--ch) * .5 + 46px) / 2); }
+.slot .card { --cw: var(--scw); --ch: calc(var(--scw) * 1.42); }
+.slot.p2 { transform: translate(-50%, calc(-100% - 4px)); }
+.slot.p0 { transform: translate(-50%, 4px); }
+.slot.p1 { transform: translate(calc(-100% - var(--scw) * .6), -50%); }
+.slot.p3 { transform: translate(calc(var(--scw) * .6), -50%); }
 /* first-ace draw piles stay next to each player */
 .dslot { position: absolute; }
 .dslot.p0 { left: 50%; bottom: 84px; transform: translateX(-50%); }
@@ -229,4 +230,15 @@ button.small { padding: 6px 10px; font-size: 13px; }
   .modal .vs .n { font-size: 24px; }
   .home-card { padding: 16px; gap: 8px; }
   .home-card h1 { font-size: 26px; }
+}
+
+/* Played cards shrink to fit the room left between the top and bottom player plates. */
+@supports (height: 1cqh) {
+  .slot { --scw: max(28px, min(var(--cw), calc((100cqh - var(--top-off, 0px) - var(--cw) * .71 - 206px) / 2.84))); }
+}
+@media (max-height: 520px) {
+  .slot { top: 50%; }
+  @supports (height: 1cqh) {
+    .slot { --scw: max(28px, min(var(--cw), calc((100cqh - 78px) / 2.84))); }
+  }
 }
