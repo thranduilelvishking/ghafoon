@@ -99,7 +99,10 @@ function chooseBidHeuristic(hand, highest) {
 // (a random partner, random opponents, a random 4-card yard), takes the yard, bags its worst four cards and names
 // its best suit exactly as it would for real, plays the round out, and bids the highest reading it made in
 // at least `risk` of those deals. Nothing here peeks at anyone's real cards.
-const BID_RISK = 0.5; // 0.5 = bid what it makes about half the time; lower is bolder, higher is safer
+// Why 0.7: a bust gives the opponents double the reading while making it scores the reading once, so a bid has to
+// come off about two times in three to pay. In bot-vs-bot games (80 each): 0.4 won 25% against the old formula,
+// 0.5 won 33%, 0.65 won 69%, 0.7 won 71% (and 80% against 0.6); 0.8 vs 0.7 was a coin flip.
+const BID_RISK = 0.7; // the reading it makes about 70% of the time; 0.5 is bolder and loses games, see below
 const BID_SAMPLES = 70;
 
 function simulateHakemTricks(hands, hakem, hokm, leader) {
