@@ -1,4 +1,5 @@
 'use strict';
+process.env.SIM_BID_SAMPLES = process.env.SIM_BID_SAMPLES || '10'; // quicker bot bidding in tests
 const test = require('node:test');
 const assert = require('node:assert');
 const E = require('../server/engine');

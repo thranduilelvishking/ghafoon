@@ -16,7 +16,7 @@ function listen() {
 // A scripted "human": it reacts to state messages by using the bot brain.
 function client(port, { auto = true } = {}) {
   const ws = new WebSocket(`ws://localhost:${port}/ws`);
-  const c = { ws, state: null, joined: null, errors: [], played: new Set(), auto, states: 0 };
+  const c = { ws, state: null, joined: null, errors: [], notices: [], played: new Set(), auto, states: 0 };
   const send = (o) => ws.send(JSON.stringify(o));
   c.send = send;
   c.waitFor = (pred, ms = 20000) => new Promise((resolve, reject) => {
@@ -30,6 +30,7 @@ function client(port, { auto = true } = {}) {
     const m = JSON.parse(data);
     if (m.t === 'joined') c.joined = m;
     if (m.t === 'error') c.errors.push(m.msg);
+    if (m.t === 'notice') c.notices.push(m.msg);
     if (m.t !== 'state') return;
     c.state = m;
     c.states++;
@@ -181,5 +182,113 @@ test('the host is whoever created the room, even after moving seats; the role pa
   b.send({ t: 'start' });
   await b.waitFor((x) => x.state.mode === 'game');
   b.ws.close(); a.ws.close();
+  server.close();
+});
+
+
+async function lobbyOf(port, names) {
+  const first = await client(port, { auto: false });
+  first.send({ t: 'join', create: true, name: names[0] });
+  await first.waitFor((x) => x.joined);
+  const all = [first];
+  for (const n of names.slice(1)) {
+    const c = await client(port, { auto: false });
+    c.send({ t: 'join', room: first.joined.room, name: n });
+    await c.waitFor((x) => x.joined);
+    all.push(c);
+  }
+  await first.waitFor((x) => x.state.seats.filter((s) => s.kind === 'human').length === names.length);
+  return all;
+}
+const settle = () => new Promise((r) => setTimeout(r, 80));
+
+test('seats: new players fill the first empty slots in order, and anyone can take an empty slot', async () => {
+  const { server, port } = await listen();
+  const [a, b, c] = await lobbyOf(port, ['Ann', 'Bo', 'Cy']);
+  assert.deepStrictEqual([a, b, c].map((x) => x.joined.seat), [0, 1, 2]);
+  b.send({ t: 'sit', seat: 3 });
+  await a.waitFor((x) => x.state.seats[3].name === 'Bo' && x.state.seats[1].kind === 'empty');
+  b.send({ t: 'sit', seat: 2 }); // taken: ignored
+  await settle();
+  assert.strictEqual(a.state.seats[3].name, 'Bo');
+  [a, b, c].forEach((x) => x.ws.close());
+  server.close();
+});
+
+test('swap: the other person must accept, and then the two really trade places (token and host stay)', async () => {
+  const { server, port } = await listen();
+  const [a, b] = await lobbyOf(port, ['Ann', 'Bo']);
+  a.send({ t: 'swap', seat: 1 });
+  await b.waitFor((x) => x.state.swapIn && x.state.swapIn.includes(0));
+  assert.strictEqual(a.state.swapOut, 1);
+  assert.strictEqual(a.state.seats[0].name, 'Ann'); // nothing has moved yet
+  assert.ok(b.notices.some((n) => /Ann would like to swap/.test(n)));
+  b.send({ t: 'swapReply', seat: 0, accept: true });
+  await a.waitFor((x) => x.state.seats[0].name === 'Bo' && x.state.seats[1].name === 'Ann');
+  assert.strictEqual(a.state.you, 1);
+  assert.strictEqual(b.state.you, 0);
+  assert.strictEqual(a.state.host, 1, 'the creator is still the host after swapping');
+  assert.strictEqual(a.state.swapOut, -1);
+  assert.deepStrictEqual(b.state.swapIn, []);
+  assert.ok(a.notices.some((n) => /swapped seats/.test(n)));
+  a.send({ t: 'start' });
+  await a.waitFor((x) => x.state.mode === 'game');
+  [a, b].forEach((x) => x.ws.close());
+  server.close();
+});
+
+test('swap: a decline moves nobody, a cancel withdraws the request', async () => {
+  const { server, port } = await listen();
+  const [a, b] = await lobbyOf(port, ['Ann', 'Bo']);
+  a.send({ t: 'swap', seat: 1 });
+  await b.waitFor((x) => x.state.swapIn.length === 1);
+  b.send({ t: 'swapReply', seat: 0, accept: false });
+  await a.waitFor((x) => x.state.swapOut === -1);
+  assert.strictEqual(a.state.seats[0].name, 'Ann');
+  assert.ok(a.notices.some((n) => /stay where they are/.test(n)));
+  a.send({ t: 'swap', seat: 1 });
+  await b.waitFor((x) => x.state.swapIn.length === 1);
+  a.send({ t: 'swapCancel' });
+  await b.waitFor((x) => x.state.swapIn.length === 0);
+  b.send({ t: 'swapReply', seat: 0, accept: true }); // nothing to accept any more
+  await settle();
+  assert.ok(b.errors.some((e) => /no longer open/.test(e)));
+  assert.strictEqual(a.state.seats[0].name, 'Ann');
+  [a, b].forEach((x) => x.ws.close());
+  server.close();
+});
+
+test('swap: moving away or leaving cancels your request; you cannot swap with an empty seat or yourself', async () => {
+  const { server, port } = await listen();
+  const [a, b, c] = await lobbyOf(port, ['Ann', 'Bo', 'Cy']);
+  a.send({ t: 'swap', seat: 3 }); // empty seat
+  a.send({ t: 'swap', seat: 0 }); // yourself
+  await settle();
+  assert.strictEqual(a.errors.length, 2);
+  a.send({ t: 'swap', seat: 1 });
+  await b.waitFor((x) => x.state.swapIn.length === 1);
+  a.send({ t: 'sit', seat: 3 }); // moves away: the request is gone
+  await b.waitFor((x) => x.state.swapIn.length === 0);
+  c.send({ t: 'swap', seat: 1 });
+  await b.waitFor((x) => x.state.swapIn.length === 1);
+  c.send({ t: 'leave' });
+  await b.waitFor((x) => x.state.swapIn.length === 0);
+  [a, b].forEach((x) => x.ws.close());
+  server.close();
+});
+
+test('swap: answering one request clears the others that involve the same people', async () => {
+  const { server, port } = await listen();
+  const [a, b, c] = await lobbyOf(port, ['Ann', 'Bo', 'Cy']);
+  a.send({ t: 'swap', seat: 1 });
+  c.send({ t: 'swap', seat: 1 });
+  await b.waitFor((x) => x.state.swapIn.length === 2);
+  b.send({ t: 'swapReply', seat: 0, accept: true }); // Bo takes Ann's seat 0, Ann goes to seat 1
+  await b.waitFor((x) => x.state.you === 0);
+  await settle();
+  assert.deepStrictEqual(a.state.seats.slice(0, 3).map((s) => s.name), ['Bo', 'Ann', 'Cy']);
+  assert.deepStrictEqual(a.state.swapIn, []);
+  assert.strictEqual(c.state.swapOut, -1, "Cy's request to the person who moved is dropped");
+  [a, b, c].forEach((x) => x.ws.close());
   server.close();
 });

@@ -3,6 +3,9 @@
 const { Game, rankOf, suitOf } = require('../server/engine');
 const bots = require('../server/bots');
 
+// Bots bid by simulating; tests can trade accuracy for speed with SIM_BID_SAMPLES.
+const BID_SAMPLES = +process.env.SIM_BID_SAMPLES || 70;
+
 // What a bot at `seat` can see when it thinks about a raise (mirrors Room.raiseCtx in the server).
 function raiseCtx(g, seat) {
   const complete = g.phase === 'trickEnd' || (g.phase === 'raiseVote' && g.raise.resume === 'trickEnd');
@@ -38,7 +41,7 @@ function playBotRound(g, stats) {
   while (g.phase === 'draw') g.finishDraw();
   while (g.phase === 'reading') {
     const s = g.turn;
-    g.bid(s, bots.chooseBid(g.hands[s], g.highest, { seat: s, sardast: g.sardast }));
+    g.bid(s, bots.chooseBid(g.hands[s], g.highest, { seat: s, sardast: g.sardast, samples: BID_SAMPLES }));
   }
   const { hokm, discards } = bots.chooseHakem(g.hands[g.hakem]);
   g.hakemDone(g.hakem, discards, hokm);

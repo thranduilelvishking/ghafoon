@@ -107,6 +107,8 @@ function onMessage(m) {
       render();
       $('home-msg').textContent = m.msg;
     } else toast(m.msg);
+  } else if (m.t === 'notice') {
+    toast(m.msg, true);
   } else if (m.t === 'left') {
     save(null);
     S = null;
@@ -115,9 +117,10 @@ function onMessage(m) {
   }
 }
 
-function toast(msg) {
+function toast(msg, info) {
   const t = $('toast');
   t.textContent = msg;
+  t.classList.toggle('notice', !!info);
   t.classList.remove('hidden');
   clearTimeout(toast.t);
   toast.t = setTimeout(() => t.classList.add('hidden'), 2600);
@@ -180,30 +183,46 @@ function renderLobby() {
   const nameBox = $('lobby-name');
   if (document.activeElement !== nameBox) nameBox.value = S.seats[S.you].name;
 
-  // Same view as the game: you at the bottom, your partner across, opponents left and right.
-  const myTeam = S.you % 2;
+  // Four fixed slots, the same for everybody: seat 1 bottom, 2 left, 3 top, 4 right.
+  // Partners sit opposite each other (1 + 3 = Team A, 2 + 4 = Team B). The game screen turns the table so that
+  // you are at the bottom, but the lobby never moves.
   const seatEls = S.seats.map((s, i) => {
-    const rel = (i - S.you + 4) % 4;
     const me = i === S.you;
-    const mine = i % 2 === myTeam;
-    const role = (me ? 'You' : rel === 2 ? 'Your partner' : 'Opponent') + (i === S.host ? ' · Host' : '');
+    const team = i % 2 === 0 ? 'ta' : 'tb';
+    const teamName = i % 2 === 0 ? 'Team A' : 'Team B';
+    const empty = s.kind === 'empty';
+    const asksMe = S.swapIn.includes(i);
+    const iAsked = S.swapOut === i;
+    const kids = [
+      h('div', { class: 'role' }, `Seat ${i + 1} · ${teamName}${i === S.host ? ' · Host' : ''}`),
+      h('div', { class: 'nm' }, empty ? 'Empty' : s.name),
+    ];
+    if (empty) kids.push(h('div', { class: 'sub' }, 'A bot plays here. Click to sit'));
+    else if (me) kids.push(h('div', { class: 'sub you' }, 'This is you'));
+    else if (asksMe) {
+      kids.push(h('div', { class: 'sub ask' }, 'wants to swap with you'),
+        h('div', { class: 'swap-row' },
+          h('button', { class: 'small yes', onclick: (e) => { e.stopPropagation(); send({ t: 'swapReply', seat: i, accept: true }); } }, 'Accept'),
+          h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swapReply', seat: i, accept: false }); } }, 'Decline')));
+    } else if (iAsked) {
+      kids.push(h('div', { class: 'sub' }, 'Waiting for their answer…'),
+        h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swapCancel' }); } }, 'Cancel'));
+    } else {
+      kids.push(h('button', { class: 'small', onclick: (e) => { e.stopPropagation(); send({ t: 'swap', seat: i }); } }, 'Ask to swap'));
+    }
     return h('div', {
-      class: `lseat ${POS[rel]} ${mine ? 'us' : 'them'} ${s.kind === 'empty' ? 'empty' : ''} ${me ? 'me' : ''}`,
-      role: s.kind === 'empty' ? 'button' : null,
-      tabindex: s.kind === 'empty' ? '0' : null,
-      onclick: s.kind === 'empty' ? () => send({ t: 'sit', seat: i }) : null,
-    },
-      h('div', { class: 'role' }, role),
-      h('div', { class: 'nm' }, s.kind === 'empty' ? 'Empty' : s.name),
-      h('div', { class: 'sub' }, s.kind === 'empty' ? 'Bot, tap to sit' : s.kind === 'human' ? 'Player' : s.kind),
-    );
+      class: `lseat p${i === 0 ? 0 : i === 1 ? 1 : i === 2 ? 2 : 3} ${team} ${empty ? 'empty' : ''} ${me ? 'me' : ''} ${asksMe ? 'asks' : ''}`,
+      role: empty ? 'button' : null,
+      tabindex: empty ? '0' : null,
+      onclick: empty ? () => send({ t: 'sit', seat: i }) : null,
+      onkeydown: empty ? (e) => { if (e.key === 'Enter' || e.key === ' ') send({ t: 'sit', seat: i }); } : null,
+    }, kids);
   });
-  const partnerSeat = (S.you + 2) % 4;
-  const named = (i) => (S.seats[i].kind === 'empty' ? 'bot' : S.seats[i].name);
+  const nm = (i) => (S.seats[i].kind === 'empty' ? 'bot' : S.seats[i].name);
   const mid = h('div', { class: 'lmid' },
-    h('div', { class: 'vsline us' }, `${S.seats[S.you].name} + ${named(partnerSeat)}`),
+    h('div', { class: 'vsline ta' }, `${nm(0)} + ${nm(2)}`),
     h('div', { class: 'vs' }, 'vs'),
-    h('div', { class: 'vsline them' }, `${named((S.you + 1) % 4)} + ${named((S.you + 3) % 4)}`));
+    h('div', { class: 'vsline tb' }, `${nm(1)} + ${nm(3)}`));
   $('lobby-seats').replaceChildren(...seatEls, mid);
 
   const host = S.host === S.you;

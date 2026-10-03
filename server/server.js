@@ -51,6 +51,7 @@ class Room {
     this.ready = new Set();
     this.deleteTimer = null;
     this.hostToken = null;
+    this.swaps = []; // pending seat-swap requests: { from: token, to: token, at }
   }
 
   // ---- seats
@@ -127,19 +128,61 @@ class Room {
     ws.ctx = { room: this, token: h.token };
   }
 
+  // ---- seat swaps (lobby only): ask the person sitting there, nothing moves unless they accept
+  dropSwaps(token) {
+    this.swaps = this.swaps.filter((r) => r.from !== token && r.to !== token);
+  }
+
+  notifyToken(token, msg) {
+    const i = this.findToken(token);
+    if (i >= 0 && this.isConnected(i)) send(this.seats[i].human.ws, { t: 'notice', msg });
+  }
+
+  swapRequest(seat, target) {
+    if (this.mode !== 'lobby') throw new GameError('seats can only be changed in the lobby');
+    if (!Number.isInteger(target) || target < 0 || target > 3 || target === seat) throw new GameError('pick another seat');
+    const other = this.seats[target].human;
+    if (!other) throw new GameError('that seat is empty: just sit there');
+    const me = this.seats[seat].human;
+    this.swaps = this.swaps.filter((r) => r.from !== me.token); // one open request at a time
+    this.swaps.push({ from: me.token, to: other.token, at: Date.now() });
+    this.notifyToken(other.token, `${me.name} would like to swap seats with you`);
+  }
+
+  swapCancel(seat) {
+    const me = this.seats[seat].human;
+    this.swaps = this.swaps.filter((r) => r.from !== me.token);
+  }
+
+  swapReply(seat, fromSeat, accept) {
+    if (this.mode !== 'lobby') throw new GameError('seats can only be changed in the lobby');
+    const me = this.seats[seat].human;
+    const asker = Number.isInteger(fromSeat) && fromSeat >= 0 && fromSeat < 4 ? this.seats[fromSeat].human : null;
+    const req = asker && this.swaps.find((r) => r.to === me.token && r.from === asker.token && Date.now() - r.at < 90000);
+    if (!req) throw new GameError('that request is no longer open');
+    this.swaps = this.swaps.filter((r) => r !== req);
+    if (!accept) return this.notifyToken(asker.token, `${me.name} would rather stay where they are`);
+    this.seats[seat].human = asker;
+    this.seats[fromSeat].human = me;
+    this.dropSwaps(me.token);
+    this.dropSwaps(asker.token);
+    this.notifyToken(asker.token, `${me.name} swapped seats with you`);
+  }
+
   detach(ws) {
     const seat = this.findToken(ws.ctx && ws.ctx.token);
     if (seat < 0) return;
     const h = this.seats[seat].human;
     if (h.ws !== ws) return;
     h.ws = null;
-    if (this.mode === 'lobby') this.seats[seat].human = null;
+    if (this.mode === 'lobby') { this.dropSwaps(h.token); this.seats[seat].human = null; }
     else h.awaySince = Date.now();
     this.ready.delete(seat);
     this.afterMembershipChange();
   }
 
   remove(seat) {
+    if (this.seats[seat].human) this.dropSwaps(this.seats[seat].human.token);
     this.seats[seat].human = null;
     this.ready.delete(seat);
   }
@@ -184,6 +227,14 @@ class Room {
     }));
     const v = { t: 'state', room: this.code, you: me, host: this.hostSeat(), mode: this.mode, seats };
     const g = this.game;
+    if (this.mode === 'lobby') {
+      const now = Date.now();
+      this.swaps = this.swaps.filter((r) => now - r.at < 90000);
+      const myToken = this.seats[me].human && this.seats[me].human.token;
+      v.swapIn = this.swaps.filter((r) => r.to === myToken).map((r) => this.findToken(r.from)).filter((i) => i >= 0);
+      const out = this.swaps.find((r) => r.from === myToken);
+      v.swapOut = out ? this.findToken(out.to) : -1;
+    }
     if (this.mode !== 'game' || !g) return v;
     const shown = ['play', 'trickEnd', 'roundEnd', 'gameOver', 'raiseVote'].includes(g.phase);
     Object.assign(v, {
@@ -388,10 +439,20 @@ class Room {
         if (this.mode !== 'lobby') return;
         const to = msg.seat;
         if (!Number.isInteger(to) || to < 0 || to > 3 || this.seats[to].human) return;
+        this.dropSwaps(this.seats[seat].human.token);
         this.seats[to].human = this.seats[seat].human;
         this.seats[seat].human = null;
         return this.changed();
       }
+      case 'swap':
+        this.swapRequest(seat, msg.seat);
+        return this.changed();
+      case 'swapCancel':
+        this.swapCancel(seat);
+        return this.changed();
+      case 'swapReply':
+        this.swapReply(seat, msg.seat, !!msg.accept);
+        return this.changed();
       case 'start':
         if (this.mode !== 'lobby') return;
         if (seat !== this.hostSeat()) throw new GameError('only the host can start the game');
