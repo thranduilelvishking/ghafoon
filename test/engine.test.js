@@ -231,6 +231,18 @@ test('first round only: the Hakem becomes Sardast if they made it, otherwise the
   assert.strictEqual(g2.sardast, 3);
 });
 
+test('first round only: the highest bidder takes the Sardast place at once (and leads); later rounds keep the Sardast', () => {
+  const g = setup({ sardast: 0, hands: [[], [], [], []], yard: [1, 2, 3, 4] });
+  g.bid(0, 0); g.bid(1, 0); g.bid(2, 8); g.bid(3, 0);
+  assert.strictEqual(g.hakem, 2);
+  assert.strictEqual(g.sardast, 2);
+  const g2 = setup({ sardast: 0, hands: [[], [], [], []], yard: [1, 2, 3, 4] });
+  g2.round = 2;
+  g2.bid(0, 0); g2.bid(1, 0); g2.bid(2, 8); g2.bid(3, 0);
+  assert.strictEqual(g2.hakem, 2);
+  assert.strictEqual(g2.sardast, 0);
+});
+
 // ------------------------------------------------------------ shuffling
 
 test('stacked shuffle keeps every card, does only 1-2 cuts', () => {

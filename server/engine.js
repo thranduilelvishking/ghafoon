@@ -245,6 +245,7 @@ class Game {
       }
       this.hakem = this.highSeat;
       this.reading = this.highest;
+      if (this.round === 1) this.sardast = this.hakem; // first round only: the Hakem takes the Sardast's place (and leads)
       this.hands[this.hakem] = this.hands[this.hakem].concat(this.yard);
       this.phase = 'hakem';
       this.turn = this.hakem;
@@ -457,7 +458,7 @@ class Game {
   nextRound() {
     if (this.phase !== 'roundEnd') throw new GameError('round not finished');
     if (this.round === 1) {
-      // first round only: whoever played (the Hakem) is the next Sardast if they made it, otherwise the player to their left
+      // first round only: the Hakem already took the Sardast's place; they keep it if they made it, otherwise it passes left
       this.sardast = this.roundResult.outcome === 'made' ? this.hakem : left(this.hakem);
     } else {
       const myTeam = teamOf(this.sardast);

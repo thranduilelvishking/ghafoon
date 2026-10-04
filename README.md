@@ -67,9 +67,10 @@ per person, and are not stored, so someone who joins later sees nothing of what 
 
 ## First round
 
-Only in the first round of a game, the player who wins the reading (the Hakem) decides who becomes Sardast next: the Hakem
-themselves if they made their reading, otherwise the player on their left (clockwise). From the second round on the normal
-rule applies (the Sardast stays unless their team is behind, then it passes left).
+Only in the first round of a game: whoever wins the reading (the Hakem) takes the Sardast's place for that round, so they
+also lead the first trick, even if someone else drew the first Ace. If they make their reading they stay Sardast, otherwise
+the player on their left (clockwise) becomes Sardast. From the second round on the normal rule applies: the Sardast stays
+while their team's score is not below the opponents', and when it is, the Sardast passes one seat clockwise.
 
 ## Shuffling
 
