@@ -110,16 +110,12 @@ function onMessage(m) {
       render();
       $('home-msg').textContent = I18N.errorText(m.msg);
     } else toast(I18N.errorText(m.msg));
-  } else if (m.t === 'chatLog') {
-    chatMsgs = m.msgs.slice();
-    chatUnread = 0;
-    renderChat();
   } else if (m.t === 'chat') {
     onChat(m.msg);
   } else if (m.t === 'notice') {
     toast(I18N.NOTICE_KEYS[m.code] ? t(I18N.NOTICE_KEYS[m.code], { name: iso(m.name) }) : m.msg, true);
   } else if (m.t === 'left') {
-    chatMsgs = []; chatUnread = 0; setChatOpen(false);
+    for (const k of Object.keys(bubbles)) delete bubbles[k];
     save(null);
     S = null;
     history.replaceState(null, '', location.pathname);
@@ -205,6 +201,7 @@ function renderLobby() {
       h('div', { class: 'role' }, t('lobby.seatLine', { seat: iso(I18N.seatLetter(i)), team: iso(I18N.teamLabel(i)) }) + (i === S.host ? t('lobby.hostTag') : '')),
       h('div', { class: 'nm' }, empty ? t('lobby.empty') : dispName(s)),
     ];
+    if (bubbles[i] && bubbles[i].until > Date.now()) kids.push(sayEl(i, 'lsay'));
     if (empty) kids.push(h('div', { class: 'sub' }, t('lobby.botHere')));
     else if (me) kids.push(h('div', { class: 'sub you' }, t('lobby.you')));
     else if (asksMe) {
@@ -389,7 +386,7 @@ function seatPlate(i) {
     backs,
     h('div', { class: `plate t${i % 2 === S.you % 2 ? 0 : 1} ${turn ? 'turn' : ''}`, title: crown ? t('crown.title') : null },
       crown || chip || plus ? h('div', { class: 'over' }, crown, chip, plus) : null,
-      bubbles[i] && bubbles[i].until > Date.now() ? h('div', { class: 'say' }, bubbles[i].text) : null,
+      sayEl(i, 'say'),
       h('div', { class: 'nm' }, dispName(info) + (i === S.you ? t('plate.you') : '')),
       h('div', { class: 'badges' }, badges),
       rel === 0 ? null : h('div', { class: 'cnt' }, t('plate.cards', { n: S.counts[i] })),
@@ -703,65 +700,32 @@ function renderOverlay() {
 
 // ------------------------------------------------------------- chat
 
-let chatMsgs = [];
-let chatUnread = 0;
-let chatOpen = false;
-const bubbles = {}; // seat -> { text, until }
-const QUICK = ['q.nice', 'q.oops', 'q.lead', 'q.gg'];
+const bubbles = {}; // seat -> { text, until }; chat is not kept, a message only pops up for a few seconds
 
-function setChatBadge() {
-  document.querySelectorAll('.chat-btn .badge-n').forEach((b) => {
-    b.textContent = chatUnread > 9 ? '9+' : String(chatUnread);
-    b.classList.toggle('hidden', chatUnread === 0);
-  });
-}
-
-function renderChat() {
-  const log = $('chat-log');
-  log.replaceChildren(...chatMsgs.map((m) => h('div', { class: `cm ${S && m.seat === S.you && m.name === S.seats[S.you].name ? 'mine' : ''}` },
-    h('span', { class: 'cn' }, m.name), h('span', { class: 'ct' }, m.text))));
-  if (!chatMsgs.length) log.append(h('div', { class: 'chat-empty' }, t('chat.empty')));
-  log.scrollTop = log.scrollHeight;
-  setChatBadge();
+// the speech bubble of a seat (null when it has expired); it pops in only the first time it is drawn
+function sayEl(i, cls) {
+  const b = bubbles[i];
+  if (!b || b.until <= Date.now()) return null;
+  const el = h('div', { class: `${cls}${b.drawn ? '' : ' fresh'}` }, b.text);
+  b.drawn = true;
+  return el;
 }
 
 function onChat(m) {
-  chatMsgs.push(m);
-  if (chatMsgs.length > 60) chatMsgs.shift();
-  const mine = S && m.seat === S.you && S.seats[S.you] && m.name === S.seats[S.you].name;
-  if (!chatOpen && !mine) chatUnread++;
-  renderChat();
-  if (S && S.mode === 'game') {
-    bubbles[m.seat] = { text: m.text, until: Date.now() + 6000 };
-    renderTable();
-    setTimeout(() => { if (S && S.mode === 'game') renderTable(); }, 6100);
-  }
+  bubbles[m.seat] = { text: m.text, until: Date.now() + 6000 };
+  const redraw = () => { if (!S) return; if (S.mode === 'game') renderTable(); else if (S.mode === 'lobby') renderLobby(); };
+  redraw();
+  setTimeout(redraw, 6100);
 }
 
-function setChatOpen(open) {
-  chatOpen = open;
-  $('chat').classList.toggle('hidden', !open);
-  if (open) {
-    chatUnread = 0;
-    setChatBadge();
-    renderChat();
-    if (!COARSE) $('chat-input').focus();
-  }
-}
-document.querySelectorAll('.chat-btn').forEach((b) => b.addEventListener('click', () => setChatOpen(!chatOpen)));
-$('chat-close').addEventListener('click', () => setChatOpen(false));
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && chatOpen) setChatOpen(false); });
-$('chat-form').addEventListener('submit', (e) => {
+document.querySelectorAll('.qchat').forEach((form) => form.addEventListener('submit', (e) => {
   e.preventDefault();
-  const text = $('chat-input').value.trim();
+  const input = form.querySelector('input');
+  const text = input.value.trim();
   if (!text) return;
   send({ t: 'chat', text });
-  $('chat-input').value = '';
-});
-function renderQuick() {
-  $('chat-quick').replaceChildren(...QUICK.map((k) => h('button', { class: 'small', type: 'button', onclick: () => send({ t: 'chat', text: t(k) }) }, t(k))));
-}
-renderQuick();
+  input.value = '';
+}));
 
 // ------------------------------------------------------------- language switch (flags) and settings
 
@@ -778,13 +742,8 @@ function setSettingsOpen(open) { $('settings').classList.toggle('hidden', !open)
 document.querySelectorAll('.gear').forEach((b) => b.addEventListener('click', () => setSettingsOpen($('settings').classList.contains('hidden'))));
 $('settings-close').addEventListener('click', () => setSettingsOpen(false));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettingsOpen(false); });
-$('set-faces').checked = I18N.faceFa();
-$('set-faces').addEventListener('change', () => I18N.setFaceFa($('set-faces').checked));
 I18N.onChange(() => {
   renderLangSwitches();
-  renderQuick();
-  renderChat();
-  $('set-faces').checked = I18N.faceFa();
   $('home-msg').textContent = '';
   if (S) render();
 });

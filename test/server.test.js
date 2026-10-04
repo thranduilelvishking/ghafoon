@@ -297,7 +297,7 @@ test('swap: answering one request clears the others that involve the same people
 });
 
 
-test('chat: messages reach everybody in the room, cleaned up and capped; late joiners get the history', async () => {
+test('chat: messages reach everybody in the room, cleaned up and capped; nothing is kept for late joiners', async () => {
   const { server, port } = await listen();
   const [a, b] = await lobbyOf(port, ['Ann', 'Bo']);
   a.send({ t: 'chat', text: '  hello\u0007   there \n  friend  ' });
@@ -313,11 +313,13 @@ test('chat: messages reach everybody in the room, cleaned up and capped; late jo
   assert.strictEqual(b.chat[1].text.length, 200);
   await settle();
   assert.strictEqual(b.chat.length, 2, 'empty messages are ignored');
-  // a third person joins later and receives the history
+  // a third person joins later and gets no history
   const c = await client(port, { auto: false });
   c.send({ t: 'join', room: a.joined.room, name: 'Cy' });
-  await c.waitFor((x) => x.chatLog);
-  assert.deepStrictEqual(c.chatLog.map((m) => m.text.slice(0, 11)), ['hello there', 'xxxxxxxxxxx']);
+  await c.waitFor((x) => x.state);
+  await settle();
+  assert.strictEqual(c.chat.length, 0);
+  assert.strictEqual(c.chatLog, null);
   // chat markup is just text: the server never interprets it
   b.send({ t: 'chat', text: '<img src=x onerror=alert(1)>' });
   await a.waitFor((x) => x.chat.length === 3);

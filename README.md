@@ -53,17 +53,23 @@ on that device, and players in the same room can use different languages, becaus
   have the same keys and placeholders, that every key the client uses exists, and that the words agreed for the game are
   the ones in use. The Persian is written in an informal, spoken style.
 - Persian reads right to left, but the table, the hand and the lobby seats are physical positions and never mirror.
-- Persian digits and the Persian card names (آس، شاه، بی‌بی، سرباز) are used in Persian mode; the gear panel has a switch
-  to show the printed A K Q J and 0-9 on the cards instead.
+- Cards always show the printed A K Q J and 2-10 (Latin letters and digits), in both languages.
 - Seats are lettered A B C D; A with B and C with D are partners and sit opposite each other.
 - The font is Vazirmatn (SIL Open Font License, `public/fonts/OFL.txt`), bundled so the game works offline.
 - Player names and chat messages are shown exactly as typed.
 
 ## Chat
 
-People in a room can chat from the lobby and during the game (the 💬 button; bots stay quiet). Messages are plain text,
-capped at 200 characters, limited to 5 per 10 seconds per person, and the last 60 are kept so someone who reconnects sees
-the history. During play a new message also pops up as a speech bubble next to the sender's name plate.
+People in a room can chat from the lobby and during the game (bots stay quiet). There is no chat window or history: a text
+box with a Send button sits next to your name plate (in the lobby, under the seats), and a message simply pops up as a speech
+bubble next to the sender for a few seconds. Messages are plain text, capped at 200 characters, limited to 5 per 10 seconds
+per person, and are not stored, so someone who joins later sees nothing of what was said before.
+
+## First round
+
+Only in the first round of a game, the player who wins the reading (the Hakem) decides who becomes Sardast next: the Hakem
+themselves if they made their reading, otherwise the player on their left (clockwise). From the second round on the normal
+rule applies (the Sardast stays unless their team is behind, then it passes left).
 
 ## Shuffling
 

@@ -29,7 +29,6 @@ const TIMING = {
 };
 
 const CHAT_MAX = 200; // characters per message
-const CHAT_KEEP = 60; // messages remembered per room
 const CHAT_BURST = 5; // at most this many messages per CHAT_WINDOW ms from one person
 const CHAT_WINDOW = 10000;
 
@@ -57,8 +56,6 @@ class Room {
     this.deleteTimer = null;
     this.hostToken = null;
     this.swaps = []; // pending seat-swap requests: { from: token, to: token, at }
-    this.chat = []; // the last CHAT_KEEP messages: { id, name, seat, text, at }
-    this.chatId = 0;
   }
 
   // ---- seats
@@ -144,15 +141,10 @@ class Room {
     h.chatTimes = (h.chatTimes || []).filter((t) => now - t < CHAT_WINDOW);
     if (h.chatTimes.length >= CHAT_BURST) throw new GameError('You are sending messages too fast');
     h.chatTimes.push(now);
-    const msg = { id: ++this.chatId, name: h.name, seat, text, at: now };
-    this.chat.push(msg);
-    if (this.chat.length > CHAT_KEEP) this.chat.shift();
+    const msg = { name: h.name, seat, text, at: now }; // not stored: late joiners see nothing
     for (let i = 0; i < 4; i++) if (this.isConnected(i)) send(this.seats[i].human.ws, { t: 'chat', msg });
   }
 
-  sendChatLog(ws) {
-    send(ws, { t: 'chatLog', msgs: this.chat });
-  }
 
   // ---- seat swaps (lobby only): ask the person sitting there, nothing moves unless they accept
   dropSwaps(token) {
@@ -570,7 +562,6 @@ function handleJoin(ws, msg) {
   }
   if (msg.create) room.hostToken = room.seats[seat].human.token;
   send(ws, { t: 'joined', room: room.code, token: room.seats[seat].human.token, seat });
-  room.sendChatLog(ws);
   clearTimeout(room.deleteTimer);
   room.deleteTimer = null;
   if (msg.create && msg.solo) return room.startGame();

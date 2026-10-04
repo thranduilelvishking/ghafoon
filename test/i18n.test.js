@@ -103,13 +103,11 @@ test('the words you chose', () => {
   I18N.setLang('en');
 });
 
-test('card faces: Persian names and digits, or the printed letters', () => {
-  I18N.setLang('fa'); I18N.setFaceFa(true);
-  assert.deepStrictEqual([14, 13, 12, 11, 10, 7].map(I18N.rankLabel), ['آس', 'شاه', 'بی‌بی', 'سرباز', '۱۰', '۷']);
-  I18N.setFaceFa(false);
+test('card faces are always the printed A K Q J and 2..10, in both languages', () => {
+  I18N.setLang('fa');
   assert.deepStrictEqual([14, 13, 12, 11, 10, 7].map(I18N.rankLabel), ['A', 'K', 'Q', 'J', '10', '7']);
-  I18N.setLang('en'); I18N.setFaceFa(false);
-  assert.strictEqual(I18N.rankLabel(14), 'A');
+  I18N.setLang('en');
+  assert.deepStrictEqual([14, 13, 12, 11, 10, 7].map(I18N.rankLabel), ['A', 'K', 'Q', 'J', '10', '7']);
 });
 
 test('seat letters: A/B and C/D are partners (opposite seats)', () => {

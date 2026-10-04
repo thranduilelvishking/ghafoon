@@ -194,6 +194,7 @@ test('sardast stays on tie, passes left when behind (old sardast becomes dealer)
   g.afterTrick(); // team 0 scores 7 -> 20-20
   assert.deepStrictEqual(g.scores, [20, 20]);
   g.pile = E.freshDeck();
+  g.round = 2; // the first-round rule does not apply any more
   g.nextRound();
   assert.strictEqual(g.sardast, 0); // tie: stays
   // now behind
@@ -202,9 +203,32 @@ test('sardast stays on tie, passes left when behind (old sardast becomes dealer)
   [0, 1, 2, 3].forEach((s) => g2.play(s, g2.hands[s][0]));
   g2.afterTrick(); // team 1 scores 7
   g2.pile = E.freshDeck();
+  g2.round = 2;
   g2.nextRound();
   assert.strictEqual(g2.sardast, 1);
   assert.strictEqual(g2.dealer, 0);
+});
+
+test('first round only: the Hakem becomes Sardast if they made it, otherwise the player on their left', () => {
+  // Hakem 2 (not the Sardast 0) makes a 7: they are the next Sardast
+  const g = toPlay({ reading: 7, sardast: 0, hakem: 2, hands: [[C(S, 2)], [C(S, 3)], [C(S, 14)], [C(S, 4)]] });
+  g.tricks = [0, 0]; g.tricks[0] = 6;
+  [0, 1, 2, 3].forEach((s) => g.play(s, g.hands[s][0]));
+  g.afterTrick();
+  assert.strictEqual(g.roundResult.outcome, 'made');
+  g.pile = E.freshDeck();
+  g.nextRound();
+  assert.strictEqual(g.round, 2);
+  assert.strictEqual(g.sardast, 2);
+  // Hakem 2 busts: the player on their left (seat 3) is the next Sardast
+  const g2 = toPlay({ reading: 7, sardast: 0, hakem: 2, hands: [[C(S, 2)], [C(S, 14)], [C(S, 3)], [C(S, 4)]] });
+  g2.tricks = [0, 0]; g2.tricks[1] = 6;
+  [0, 1, 2, 3].forEach((s) => g2.play(s, g2.hands[s][0]));
+  g2.afterTrick();
+  assert.strictEqual(g2.roundResult.outcome, 'busted');
+  g2.pile = E.freshDeck();
+  g2.nextRound();
+  assert.strictEqual(g2.sardast, 3);
 });
 
 // ------------------------------------------------------------ shuffling

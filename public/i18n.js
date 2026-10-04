@@ -8,14 +8,14 @@
 
   const en = {
     // settings
-    'set.title': 'Settings', 'set.language': 'Language', 'set.cards': 'Persian card names (آس، شاه، بی‌بی، سرباز)', 'set.close': 'Close',
+    'set.title': 'Settings', 'set.language': 'Language', 'set.close': 'Close',
     // home
     'home.tag': 'Four players, two teams, 104 points. Empty seats are played by bots.',
     'home.name': 'Your name', 'home.namePh': 'Pick a name', 'home.solo': 'Quick play vs 3 bots', 'home.create': 'Create a room for friends',
     'home.codePh': 'CODE', 'home.join': 'Join room', 'home.needName': 'Pick a name first', 'home.needCode': 'Enter the 4-letter room code',
     'home.nameAndJoin': 'Enter your name and press Join room',
     // lobby
-    'lobby.room': 'Room', 'lobby.chat': '💬 Chat',
+    'lobby.room': 'Room',
     'lobby.help': 'Share the link or code. The seats stay where they are for everyone, and partners sit opposite each other (A with B, C with D). New players fill the first empty seat. Click an empty seat to move there, or ask someone to swap. Empty seats are played by bots.',
     'lobby.copy': 'Copy link', 'lobby.copied': 'Link copied', 'lobby.yourName': 'Your name', 'lobby.start': 'Start game', 'lobby.leave': 'Leave',
     'lobby.seatLine': 'Seat {seat} · Team {team}', 'lobby.hostTag': ' · Host', 'lobby.empty': 'Empty',
@@ -81,8 +81,7 @@
     'end.win': '🏆 You win!', 'end.lose': 'You lose', 'end.won104': 'Your team reached 104 first.', 'end.lost104': 'The opponents reached 104 first.',
     'end.lobby': 'Back to lobby', 'end.leave': 'Leave room',
     // chat
-    'chat.title': 'Chat', 'chat.open': 'Open chat', 'chat.close': 'Close chat', 'chat.ph': 'Say something…', 'chat.send': 'Send',
-    'chat.empty': 'No messages yet. Say hi!', 'q.nice': 'Nice!', 'q.oops': 'Oops', 'q.lead': 'Your lead', 'q.gg': 'Good game',
+    'chat.ph': 'Say something…', 'chat.send': 'Send',
     // connection and server messages
     'conn.lost': 'Connection lost, reconnecting…',
     'e.generic': 'Something went wrong. Try again.',
@@ -99,12 +98,12 @@
   };
 
   const fa = {
-    'set.title': 'تنظیمات', 'set.language': 'زبان', 'set.cards': 'اسم فارسی کارت‌ها (آس، شاه، بی‌بی، سرباز)', 'set.close': 'بستن',
+    'set.title': 'تنظیمات', 'set.language': 'زبان', 'set.close': 'بستن',
     'home.tag': 'چهار نفر، دو تیم، ۱۰۴ امتیاز. جاهای خالی رو ربات‌ها پر می‌کنن.',
     'home.name': 'اسمت', 'home.namePh': 'یه اسم انتخاب کن', 'home.solo': 'بازی سریع با ۳ ربات', 'home.create': 'ساخت اتاق برای رفیقا',
     'home.codePh': 'کد', 'home.join': 'ورود به اتاق', 'home.needName': 'اول یه اسم انتخاب کن', 'home.needCode': 'کد ۴ حرفی اتاق رو بنویس',
     'home.nameAndJoin': 'اسمت رو بنویس و «ورود به اتاق» رو بزن',
-    'lobby.room': 'اتاق', 'lobby.chat': '💬 گفتگو',
+    'lobby.room': 'اتاق',
     'lobby.help': 'لینک یا کد رو برای رفیقات بفرست. جاها برای همه ثابته و هم‌تیمی‌ها روبه‌روی هم می‌شینن (A با B، C با D). هر کی تازه بیاد تو اولین جای خالی می‌شینه. برای رفتن به یه جای خالی روش بزن، یا از یکی بخواه جاش رو باهات عوض کنه. جاهای خالی رو ربات‌ها بازی می‌کنن.',
     'lobby.copy': 'کپی لینک', 'lobby.copied': 'لینک کپی شد', 'lobby.yourName': 'اسمت', 'lobby.start': 'شروع بازی', 'lobby.leave': 'خروج',
     'lobby.seatLine': 'جایگاه {seat} · تیم {team}', 'lobby.hostTag': ' · میزبان', 'lobby.empty': 'خالی',
@@ -160,8 +159,7 @@
     'end.next': 'دور بعد', 'end.waitOthers': 'منتظر بقیه…', 'end.waitNames': 'منتظر {names}',
     'end.win': '🏆 بردی!', 'end.lose': 'باختی', 'end.won104': 'تیم ما اول به ۱۰۴ رسید.', 'end.lost104': 'رقیبا اول به ۱۰۴ رسیدن.',
     'end.lobby': 'برگشت به سالن انتظار', 'end.leave': 'خروج از اتاق',
-    'chat.title': 'گفتگو', 'chat.open': 'باز کردن گفتگو', 'chat.close': 'بستن گفتگو', 'chat.ph': 'یه چیزی بگو…', 'chat.send': 'ارسال',
-    'chat.empty': 'هنوز پیامی نیست. سلام کن!', 'q.nice': 'آفرین!', 'q.oops': 'ای وای', 'q.lead': 'تو شروع کن', 'q.gg': 'بازی خوبی بود',
+    'chat.ph': 'یه چیزی بگو…', 'chat.send': 'ارسال',
     'conn.lost': 'اتصال قطع شد، دوباره وصل می‌شیم…',
     'e.generic': 'یه مشکلی پیش اومد. دوباره امتحان کن.',
     'e.follow': 'باید از همون خال بازی کنی', 'e.turn': 'نوبتت نیست', 'e.card': 'این کارت دست تو نیست',
@@ -197,13 +195,12 @@
   const NOTICE_KEYS = { swapAsk: 'n.swapAsk', swapDone: 'n.swapDone', swapNo: 'n.swapNo' };
 
   const BOT_NAMES_FA = { Arash: 'آرش', Bahar: 'بهار', Cyrus: 'کوروش', Dara: 'دارا' };
-  const FACE_FA = { 14: 'آس', 13: 'شاه', 12: 'بی' + ZWNJ + 'بی', 11: 'سرباز' };
   const FACE_LATIN = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' };
   // Seats are lettered so that partners are A with B (opposite) and C with D: seat index 0, 2, 1, 3 -> A, B, C, D.
   const SEAT_LETTER = ['A', 'C', 'B', 'D'];
 
   const dicts = { en, fa };
-  const state = { lang: 'fa', faceFa: null };
+  const state = { lang: 'fa' };
   const listeners = [];
 
   function store(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } }
@@ -231,22 +228,16 @@
       if (!dicts[l]) return;
       state.lang = l;
       store('ghafoon-lang', l);
-      if (state.faceFa === null) state.faceFa = l === 'fa';
       api.applyStatic();
       listeners.forEach((f) => f());
     },
-    faceFa: () => (state.faceFa === null ? state.lang === 'fa' : state.faceFa),
-    setFaceFa(b) { state.faceFa = !!b; store('ghafoon-faces', b ? 'fa' : 'latin'); listeners.forEach((f) => f()); },
     onChange(f) { listeners.push(f); },
     suitName: (s) => t('suit.' + s),
     seatLetter: (i) => SEAT_LETTER[i],
     teamLabel: (i) => (i % 2 === 0 ? 'A/B' : 'C/D'),
     botName: (name) => (state.lang === 'fa' && BOT_NAMES_FA[name]) || name,
-    // card face for a rank 2..14 (Persian names and digits, or the printed A K Q J and 2..10)
-    rankLabel(r) {
-      if (r >= 11) return api.faceFa() ? FACE_FA[r] : FACE_LATIN[r];
-      return api.faceFa() ? String(r).replace(/[0-9]/g, (d) => FA_DIGITS[+d]) : String(r);
-    },
+    // card face for a rank 2..14: always the printed A K Q J and 2..10, in every language
+    rankLabel: (r) => (r >= 11 ? FACE_LATIN[r] : String(r)),
     errorText(msg) { return t(ERROR_KEYS[msg] || 'e.generic'); },
     // a reading as words: "10" / "Sheet" / "ALL"; withUnit adds "دست" in Persian ("۱۰ دست")
     readingLabel(n, raised) {
@@ -271,12 +262,10 @@
       document.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
       document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
     },
-    // read the saved choices (default: Persian, Persian card names in Persian)
+    // read the saved choices (default: Persian)
     init() {
       const l = load('ghafoon-lang');
       state.lang = l === 'en' || l === 'fa' ? l : 'fa';
-      const f = load('ghafoon-faces');
-      state.faceFa = f === 'fa' ? true : f === 'latin' ? false : null;
       api.applyStatic();
     },
   };

@@ -456,8 +456,13 @@ class Game {
   // Moves on from a finished round: decides the next Sardast.
   nextRound() {
     if (this.phase !== 'roundEnd') throw new GameError('round not finished');
-    const myTeam = teamOf(this.sardast);
-    if (this.scores[myTeam] < this.scores[1 - myTeam]) this.sardast = left(this.sardast);
+    if (this.round === 1) {
+      // first round only: whoever played (the Hakem) is the next Sardast if they made it, otherwise the player to their left
+      this.sardast = this.roundResult.outcome === 'made' ? this.hakem : left(this.hakem);
+    } else {
+      const myTeam = teamOf(this.sardast);
+      if (this.scores[myTeam] < this.scores[1 - myTeam]) this.sardast = left(this.sardast);
+    }
     this.startRound();
   }
 }
