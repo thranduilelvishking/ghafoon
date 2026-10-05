@@ -34,6 +34,13 @@ test('deal: 12 each, widow of 4 (6 with Jokers), no duplicates', () => {
   }
 });
 
+test('the first deal and a redeal are thorough shuffles', () => {
+  const g = game();
+  assert.strictEqual(g.shuffleInfo.kind, 'full');
+  g.bid(0, 0); g.bid(1, 0); g.bid(2, 0);
+  assert.strictEqual(g.shuffleInfo.kind, 'full');
+});
+
 test('bidding: steps of 5 from the opening bid, must beat the highest, three passes make the Hakem', () => {
   const g = game();
   assert.throws(() => g.bid(0, 95));
@@ -248,7 +255,12 @@ test('bots play complete games in every format, with and without Top Hokm must f
         else if (g.phase === 'roundEnd') {
           const r = g.roundResult;
           assert.strictEqual(r.totals[0] + r.totals[1], g.cfg.total, 'every point is taken by somebody');
+          const piled = g.pile.slice();
+          assert.strictEqual(piled.length, g.cfg.jokers ? 54 : 52, 'the whole deck is collected');
+          assert.deepStrictEqual(piled.slice(0, g.cfg.widow), g.discard, 'the discard is at the bottom of the stack');
           g.nextRound();
+          assert.strictEqual(g.shuffleInfo.kind, 'stacked', 'later rounds are stacked and cut, not shuffled');
+          assert.strictEqual(new Set([...g.hands.flat(), ...g.widow]).size, piled.length);
         }
       }
       assert.strictEqual(g.phase, 'gameOver', `${f} topHokm=${topHokm} finished`);

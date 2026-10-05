@@ -61,7 +61,7 @@ function lightOverhand(deck, links, rand) {
 // two times at arbitrary positions (so a break may land in the middle of a trick). Whatever hands come out
 // of the deal are whatever the stacks and breaks produce; nothing evaluates or steers them.
 function stackedShuffle(pile, rand = randInt, mix = MIX_LINKS) {
-  if (pile.length !== 52) throw new Error('pile must have 52 cards');
+  if (pile.length !== 52 && pile.length !== 54) throw new Error('pile must have 52 cards (54 with the Shelem Jokers)');
   let d = mix > 0 ? lightOverhand(pile, mix, rand) : pile.slice();
   const cuts = 1 + rand(2); // 1 or 2 breaks
   for (let i = 0; i < cuts; i++) {

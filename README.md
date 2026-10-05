@@ -40,9 +40,12 @@ Hokm (with a Joker he names the suit). Scoring is exactly the table in the rules
 minus the bid, Yasa = minus twice the bid, Shelem = double the round total, and the defenders always keep what they took.
 
 Where the rules file still had open questions, the game uses these defaults: Shelem is double the round total in every mode
-(330 / 370 / 460), the defenders get no special bonus for taking every trick, and if both teams pass the target in the same
-round the team with the higher total wins (a tie goes to the Hakem's team). Cards are fully shuffled before every deal and
-the dealer moves one seat clockwise after each round. The bots bid by simulating the unseen cards, so they bid on what
+(330 / 370 / 460), and if both teams pass the target in the same round the team with the higher total wins (a tie goes to
+the Hakem's team). The defenders simply score the points they took: they can never take every point, because the Hakem's
+discard is always a trick for the Hakem's team, so there is no Shelem for the defenders. Shuffling works like Ghafoon: a
+thorough shuffle for the first deal (and for a redeal after everybody passed), and from the second round on the previous
+round's cards (the discard first, then the tricks as they fell) are only cut once or twice. The dealer moves one seat
+clockwise after each round. Like Ghafoon, the game names stay in Latin letters in both languages (Ghafoon, Shelem). The bots bid by simulating the unseen cards, so they bid on what
 their hand is likely to take.
 
 ## Sheet contracts

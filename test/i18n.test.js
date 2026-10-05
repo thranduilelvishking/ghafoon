@@ -26,7 +26,7 @@ test('no string is empty and every Persian string is really Persian (or a delibe
     assert.ok(v.trim().length > 0, `${k} is empty`);
     // a string made only of {placeholders} and punctuation (like "{label}: {rule}. ") needs no Persian letters
     const withoutPlaceholders = v.replace(/\{\w+\}/g, '');
-    if (k === 'sh.ghafoon') continue; // the game name stays Latin
+    if (k === 'sh.ghafoon' || k === 'sh.name') continue; // the game names stay Latin
     if (/[A-Za-z]/.test(withoutPlaceholders) || /[\u0600-\u06FF]/.test(withoutPlaceholders) || !/\{/.test(v)) {
       assert.ok(hasPersian(v), `${k} has no Persian letters: ${v}`);
     }
@@ -38,6 +38,8 @@ test('the game name is never translated', () => {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   assert.match(html, /<title>Ghafoon<\/title>/);
   for (const v of [...Object.values(en), ...Object.values(fa)]) assert.ok(!/قفون|غفون|گفون/.test(v), 'the name must stay Ghafoon');
+  assert.strictEqual(fa['sh.name'], 'Shelem');
+  assert.strictEqual(en['sh.name'], 'Shelem');
 });
 
 test('every translation key used by the client exists', () => {

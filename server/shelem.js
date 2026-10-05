@@ -6,7 +6,7 @@
 // and ranks above the Ace of Hokm (Black 15, Color 16).
 
 const crypto = require('crypto');
-const { suitOf, rankOf, makeCard, left, teamOf, freshDeck, fullShuffle, GameError } = require('./engine');
+const { suitOf, rankOf, makeCard, left, teamOf, freshDeck, fullShuffle, stackedShuffle, MIX_LINKS, GameError } = require('./engine');
 
 const BLACK = 52;
 const COLOR = 53;
@@ -93,9 +93,31 @@ class ShelemGame {
 
   startRound() {
     if (this.phase === 'gameOver') throw new GameError('game over');
-    const deck = fullShuffle(freshDeck().concat(this.cfg.jokers ? [BLACK, COLOR] : []), this.rand);
-    this.hands = [0, 1, 2, 3].map((i) => deck.slice(i * 12, i * 12 + 12));
-    this.widow = deck.slice(48);
+    // Same mechanics as Ghafoon: the first deal (and a redeal after everybody passed) is a thorough shuffle; every later
+    // round stacks the previous round's cards (discard, then the tricks as they fell) and only cuts them once or twice.
+    let deck;
+    if (this.pile) {
+      const s = stackedShuffle(this.pile, this.rand, MIX_LINKS);
+      deck = s.deck;
+      this.shuffleInfo = { kind: 'stacked', cuts: s.cuts };
+    } else {
+      deck = fullShuffle(freshDeck().concat(this.cfg.jokers ? [BLACK, COLOR] : []), this.rand);
+      this.shuffleInfo = { kind: 'full' };
+    }
+    this.pile = null;
+    // 12 cards to the first bidder, then one to the widow, and the same for the next players; the rest of the widow comes last
+    this.hands = [[], [], [], []];
+    this.widow = [];
+    let p = 0;
+    let seat = left(this.dealer);
+    for (let n = 0; n < 4; n++) {
+      this.hands[seat] = deck.slice(p, p + 12);
+      p += 12;
+      const give = n < 3 ? 1 : this.cfg.widow - 3;
+      this.widow.push(...deck.slice(p, p + give));
+      p += give;
+      seat = left(seat);
+    }
     this.round++;
     this.bids = [null, null, null, null]; // null = not spoken yet, 0 = passed
     this.passed = [false, false, false, false];
@@ -139,6 +161,7 @@ class ShelemGame {
     if (this.highSeat === null && this.spoken >= 3) {
       // the first three to speak all passed: cancelled, same dealer deals again, whatever the 4th would have said
       this.redeals++;
+      this.pile = null; // a redeal is a thorough shuffle
       this.startRound();
       this.round--; // a redeal is not a new round
       return;
@@ -275,6 +298,9 @@ class ShelemGame {
     }
     this.scores[0] += delta[0];
     this.scores[1] += delta[1];
+    // the cards for the next shuffle: the discard first, then every trick in the order it was played
+    this.pile = this.discard.slice();
+    for (const t of this.trickLog) for (const pl of t.plays) this.pile.push(pl.card);
     this.roundResult = {
       outcome, hakem: this.hakem, hakemTeam: ht, bid, totals, delta, tricks: this.tricks.slice(), points: this.points.slice(),
       shelemBonus: outcome === 'shelem' ? 2 * total : 0,
