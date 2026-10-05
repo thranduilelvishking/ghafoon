@@ -186,6 +186,7 @@ function renderShelemStatus() {
     default: msg = '';
   }
   $('status').textContent = msg;
+  placeStatus();
 }
 
 function renderShelemActions() {

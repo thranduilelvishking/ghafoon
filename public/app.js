@@ -530,6 +530,16 @@ function renderStatus() {
     default: msg = '';
   }
   $('status').textContent = msg0 + msg;
+  placeStatus();
+}
+
+// On an upright phone the hint line floats in the empty space above the top player, right under the info boxes
+// (which can wrap onto two lines).
+function placeStatus() {
+  const st = $('status');
+  if (!matchMedia('(max-width: 640px) and (min-height: 521px)').matches) { st.style.top = ''; return; }
+  const info = $('info');
+  st.style.top = `${info.offsetTop + info.offsetHeight + 6}px`;
 }
 
 function renderActions() {
@@ -776,7 +786,7 @@ renderGamePick();
 
 // ------------------------------------------------------------- phones: orientation, sleep, wake lock
 
-window.addEventListener('resize', () => { if (S && S.mode === 'game') renderHand(); });
+window.addEventListener('resize', () => { if (S && S.mode === 'game') { renderHand(); placeStatus(); } });
 let wakeLock = null;
 async function keepAwake() {
   try {
