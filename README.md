@@ -1,6 +1,6 @@
-# Ghafoon
+# Ghafoon (and Shelem)
 
-A browser version of the Ghafoon card game. Four players, two teams (seats 0+2 vs 1+3), first team to 104
+A browser version of the Ghafoon card game, with Shelem next to it (see below). Four players, two teams (seats 0+2 vs 1+3), first team to 104
 wins. Up to 4 humans per room; empty seats are played by bots, and a bot also takes over if a human
 disconnects (they can reconnect and get the seat back; a new player can also join a running game into a
 bot seat).
@@ -11,15 +11,39 @@ bot seat).
     npm start          # http://localhost:3000   (PORT=... to change)
     npm test
 
-Open the page, pick **Quick play** (you + 3 bots) or **Create a room** and share the link / 4-letter code.
+Open the page, choose the game (**Ghafoon** or **Shelem**), then pick **Quick play** (you + 3 bots) or **Create a room** and share the link / 4-letter code.
 
 ## Layout
 
-- `server/engine.js`: the rules (reading, hakem/bag/hokm, tricks, scoring, sardast rotation) and the shuffle.
+- `server/shelem.js`, `server/shelemBots.js`: the Shelem rules engine and its bots (see `SHELEM_RULES.md`).
+- `server/engine.js`: the Ghafoon rules (reading, hakem/bag/hokm, tricks, scoring, sardast rotation) and the shuffle.
 - `server/bots.js`: bot bidding, bag/hokm choice and card play.
 - `server/server.js`: static files + WebSocket rooms. The server is authoritative; clients only see their own hand.
 - `public/`: the client (vanilla JS, no build step).
 - `test/`: rules/shuffle tests, bot-only self-play, and WebSocket integration tests.
+
+## Shelem
+
+Choose **Shelem** on the home screen before creating a room. A Shelem room always opens in the lobby (quick play too),
+where the host picks the mode and options before pressing Start game (everyone else sees them but cannot change them):
+
+- **Mode**: Classic (52 cards, bids from 100), Ace-15 (Aces are worth 15, bids from 120), Joker (two Jokers, the top Hokm
+  cards, 6-card widow, bids from 120).
+- **Top Hokm must fall** (optional): the holder of the Ace of Hokm (the Color Joker in Joker mode) must play it in the
+  first trick.
+- **Win at**: the score target (the format's default, changeable in steps of 50); a team that falls to minus half of it loses.
+
+Everything else follows `SHELEM_RULES.md`: the player after the dealer bids first in steps of 5, three passes make the
+Hakem, and if the first three speakers all pass the same dealer deals again. The Hakem takes the widow, puts down the same
+number of cards (they count as a trick, point cards included), leads the first trick, and the suit of that first card is
+Hokm (with a Joker he names the suit). Scoring is exactly the table in the rules: made = all the points taken, failed =
+minus the bid, Yasa = minus twice the bid, Shelem = double the round total, and the defenders always keep what they took.
+
+Where the rules file still had open questions, the game uses these defaults: Shelem is double the round total in every mode
+(330 / 370 / 460), the defenders get no special bonus for taking every trick, and if both teams pass the target in the same
+round the team with the higher total wins (a tie goes to the Hakem's team). Cards are fully shuffled before every deal and
+the dealer moves one seat clockwise after each round. The bots bid by simulating the unseen cards, so they bid on what
+their hand is likely to take.
 
 ## Sheet contracts
 

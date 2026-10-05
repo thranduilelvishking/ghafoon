@@ -8,6 +8,8 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { Game, GameError, left } = require('./engine');
 const bots = require('./bots');
+const shelem = require('./shelem');
+const shelemBots = require('./shelemBots');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const PORT = +process.env.PORT || 3000;
@@ -50,6 +52,8 @@ class Room {
     this.code = code;
     this.seats = [0, 1, 2, 3].map(() => ({ human: null })); // human: { token, name, ws, awaySince }
     this.game = null;
+    this.kind = 'ghafoon'; // which game this room plays: ghafoon | shelem (chosen when the room is created)
+    this.options = null; // Shelem only: { format, topHokm, target }, set by the host in the lobby
     this.mode = 'lobby'; // lobby | game
     this.timer = null;
     this.ready = new Set();
@@ -249,7 +253,8 @@ class Room {
       name: this.seatName(i),
       kind: !s.human ? (this.mode === 'lobby' ? 'empty' : 'bot') : this.isConnected(i) ? 'human' : 'away',
     }));
-    const v = { t: 'state', room: this.code, you: me, host: this.hostSeat(), mode: this.mode, seats };
+    const v = { t: 'state', room: this.code, you: me, host: this.hostSeat(), mode: this.mode, seats, game: this.kind };
+    if (this.kind === 'shelem') v.options = this.options;
     const g = this.game;
     if (this.mode === 'lobby') {
       const now = Date.now();
@@ -260,6 +265,7 @@ class Room {
       v.swapOut = out ? this.findToken(out.to) : -1;
     }
     if (this.mode !== 'game' || !g) return v;
+    if (this.kind === 'shelem') return this.shelemView(v, g, me);
     const shown = ['play', 'trickEnd', 'roundEnd', 'gameOver', 'raiseVote'].includes(g.phase);
     Object.assign(v, {
       phase: g.phase,
@@ -300,9 +306,40 @@ class Room {
     return v;
   }
 
+  shelemView(v, g, me) {
+    return Object.assign(v, {
+      phase: g.phase,
+      round: g.round,
+      scores: g.scores,
+      dealer: g.dealer,
+      turn: g.turn,
+      hakem: g.hakem,
+      bids: g.bids,
+      passed: g.passed,
+      highest: g.highest,
+      highSeat: g.highSeat,
+      redeals: g.redeals,
+      hokm: g.hokm,
+      hand: g.hands[me],
+      counts: g.hands.map((h) => h.length),
+      legal: g.legalFor(me),
+      plays: g.plays,
+      leader: g.leader,
+      tricks: g.tricks,
+      firstTrick: g.firstTrick,
+      lastTrick: g.lastTrick,
+      trickWinner: g.phase === 'trickEnd' ? g.trickWinner : null,
+      roundResult: g.roundResult,
+      ready: [...this.ready],
+      winner: g.winner,
+      target: g.target,
+      widowSize: g.cfg.widow,
+    });
+  }
+
   // ---- game flow
   startGame() {
-    this.game = new Game();
+    this.game = this.kind === 'shelem' ? new shelem.ShelemGame(this.options) : new Game();
     this.mode = 'game';
     this.ready.clear();
     this.game.startRound();
@@ -340,6 +377,7 @@ class Room {
     if (this.mode !== 'game' || !g || !this.anyConnected()) return;
     const phase = g.phase;
     const jitter = () => (process.env.GHAFOON_FAST ? 0 : Math.random() * 400);
+    if (this.kind === 'shelem') return this.tickShelem(g, jitter);
     switch (phase) {
       case 'draw':
         return this.after(TIMING.draw, () => { if (g.phase === 'draw') { g.finishDraw(); this.changed(); } });
@@ -369,6 +407,46 @@ class Room {
         return this.after(TIMING.roundEndMax, () => this.nextRound());
       default:
     }
+  }
+
+  tickShelem(g, jitter) {
+    switch (g.phase) {
+      case 'bid':
+        if (this.isBot(g.turn)) this.after(TIMING.botBid + jitter(), () => this.shelemBotStep('bid'));
+        return;
+      case 'widow':
+        if (this.isBot(g.hakem)) this.after(TIMING.botHakem + jitter(), () => this.shelemBotStep('widow'));
+        return;
+      case 'play':
+        if (this.isBot(g.turn)) this.after(TIMING.botPlay + jitter(), () => this.shelemBotStep('play'));
+        return;
+      case 'trickEnd':
+        return this.after(TIMING.trickEnd, () => { if (g.phase === 'trickEnd') { g.afterTrick(); this.changed(); } });
+      case 'roundEnd':
+        if (this.allReady()) return this.nextRound();
+        return this.after(TIMING.roundEndMax, () => this.nextRound());
+      default:
+    }
+  }
+
+  shelemBotStep(expected) {
+    const g = this.game;
+    if (!g || g.phase !== expected) return;
+    if (g.phase === 'bid') {
+      const s = g.turn;
+      if (!this.isBot(s)) return;
+      g.bid(s, shelemBots.chooseBid(g, s));
+    } else if (g.phase === 'widow') {
+      const s = g.hakem;
+      if (!this.isBot(s)) return;
+      g.hakemDiscard(s, shelemBots.chooseWidowDiscards(g, s));
+    } else if (g.phase === 'play') {
+      const s = g.turn;
+      if (!this.isBot(s)) return;
+      const { card, hokm } = shelemBots.choosePlay(g, s);
+      g.play(s, card, hokm);
+    }
+    this.changed();
   }
 
   allReady() {
@@ -484,6 +562,12 @@ class Room {
         if (this.mode !== 'lobby') return;
         if (seat !== this.hostSeat()) throw new GameError('only the host can start the game');
         return this.startGame();
+      case 'options': {
+        if (this.mode !== 'lobby' || this.kind !== 'shelem') return;
+        if (seat !== this.hostSeat()) throw new GameError('only the host can change the options');
+        this.options = shelem.cleanOptions(msg, this.options);
+        return this.changed();
+      }
       case 'bid':
         if (!g) return;
         g.bid(seat, msg.value);
@@ -493,24 +577,25 @@ class Room {
         g.hakemDiscard(seat, msg.discards);
         return this.changed();
       case 'hokm':
-        if (!g) return;
+        if (!g || this.kind === 'shelem') return;
         g.chooseHokm(seat, msg.hokm);
         return this.changed();
       case 'raise':
-        if (!g) return;
+        if (!g || this.kind === 'shelem') return;
         g.declareRaise(seat, msg.to);
         return this.changed();
       case 'vote':
-        if (!g) return;
+        if (!g || this.kind === 'shelem') return;
         g.voteRaise(seat, !!msg.yes);
         return this.changed();
       case 'contract':
-        if (!g) return;
+        if (!g || this.kind === 'shelem') return;
         g.chooseContract(seat, msg.contract, msg.hokm);
         return this.changed();
       case 'play':
         if (!g) return;
-        g.play(seat, msg.card);
+        if (this.kind === 'shelem') g.play(seat, msg.card, msg.hokm);
+        else g.play(seat, msg.card);
         return this.changed();
       case 'ready':
         if (!g || g.phase !== 'roundEnd') return;
@@ -545,6 +630,7 @@ function handleJoin(ws, msg) {
   let seat = -1;
   if (msg.create) {
     room = new Room(newCode());
+    if (msg.game === 'shelem') { room.kind = 'shelem'; room.options = shelem.defaultOptions(); }
     rooms.set(room.code, room);
   } else {
     room = rooms.get(String(msg.room || '').toUpperCase().trim());
@@ -564,7 +650,7 @@ function handleJoin(ws, msg) {
   send(ws, { t: 'joined', room: room.code, token: room.seats[seat].human.token, seat });
   clearTimeout(room.deleteTimer);
   room.deleteTimer = null;
-  if (msg.create && msg.solo) return room.startGame();
+  if (msg.create && msg.solo && room.kind === 'ghafoon') return room.startGame(); // Shelem always opens in the lobby, for its options
   room.changed();
 }
 

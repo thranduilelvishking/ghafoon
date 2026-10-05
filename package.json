@@ -5,7 +5,7 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "test": "node --test test/engine.test.js test/bots.test.js test/i18n.test.js && node --test --test-force-exit test/server.test.js"
+    "test": "node --test test/engine.test.js test/bots.test.js test/shelem.test.js test/i18n.test.js && node --test --test-force-exit test/server.test.js test/shelem-server.test.js"
   },
   "license": "MIT",
   "dependencies": {

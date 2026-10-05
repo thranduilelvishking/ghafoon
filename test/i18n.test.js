@@ -26,6 +26,7 @@ test('no string is empty and every Persian string is really Persian (or a delibe
     assert.ok(v.trim().length > 0, `${k} is empty`);
     // a string made only of {placeholders} and punctuation (like "{label}: {rule}. ") needs no Persian letters
     const withoutPlaceholders = v.replace(/\{\w+\}/g, '');
+    if (k === 'sh.ghafoon') continue; // the game name stays Latin
     if (/[A-Za-z]/.test(withoutPlaceholders) || /[\u0600-\u06FF]/.test(withoutPlaceholders) || !/\{/.test(v)) {
       assert.ok(hasPersian(v), `${k} has no Persian letters: ${v}`);
     }
@@ -40,7 +41,7 @@ test('the game name is never translated', () => {
 });
 
 test('every translation key used by the client exists', () => {
-  const src = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
+  const src = ['app.js', 'shelem.js'].map((f) => fs.readFileSync(path.join(__dirname, '../public', f), 'utf8')).join('\n');
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   const keys = new Set();
   for (const m of src.matchAll(/'((?:[a-z]+)\.[A-Za-z0-9.]+)'/g)) keys.add(m[1]);
@@ -49,11 +50,14 @@ test('every translation key used by the client exists', () => {
   for (const k of keys) {
     if (skip(k)) continue;
     // keys built at run time: c.<contract>[.rule|.short], suit.<n>, e.* and n.* come from the server tables
-    assert.ok(k in en || /^(c|suit)\.$/.test(k), `unknown translation key in the client: ${k}`);
+    assert.ok(k in en || /^(c|suit|sh\.home\.hint|sh\.fmt)\.$/.test(k), `unknown translation key in the client: ${k}`);
   }
   for (const c of ['hokm', 'saras', 'naras', 'taknaras']) for (const sfx of ['', '.rule']) assert.ok(`c.${c}${sfx}` in en);
   for (const c of ['saras', 'naras', 'taknaras']) assert.ok(`c.${c}.short` in en);
   for (let s = 0; s < 4; s++) assert.ok(`suit.${s}` in en);
+  for (const g of ['ghafoon', 'shelem']) assert.ok(`sh.home.hint.${g}` in en);
+  for (const f of ['classic', 'ace', 'joker']) assert.ok(`sh.fmt.${f}` in en && `sh.fmt.${f}.d` in en);
+  for (const o of ['made', 'failed', 'yasa', 'shelem']) for (const w of ['Us', 'Them']) assert.ok(`sh.end.${o}${w}` in en);
 });
 
 test('server messages: every known error and notice maps to a key in both languages', () => {

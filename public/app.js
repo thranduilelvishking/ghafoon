@@ -135,8 +135,22 @@ function toast(msg, info) {
 // ------------------------------------------------------------- home / lobby actions
 
 $('name').value = (() => { try { return localStorage.getItem('ghafoon-name') || ''; } catch (e) { return ''; } })();
-$('btn-solo').onclick = () => { const name = requireName(); if (name) connect(() => send({ t: 'join', create: true, solo: true, name })); };
-$('btn-create').onclick = () => { const name = requireName(); if (name) connect(() => send({ t: 'join', create: true, name })); };
+// which game a new room plays (Ghafoon or Shelem); joining by code uses whatever the room plays
+let gameChoice = (() => { try { return localStorage.getItem('ghafoon-game') === 'shelem' ? 'shelem' : 'ghafoon'; } catch (e) { return 'ghafoon'; } })();
+function renderGamePick() {
+  document.querySelectorAll('.game-pick [data-game]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.game === gameChoice);
+    b.setAttribute('aria-pressed', String(b.dataset.game === gameChoice));
+  });
+  $('game-hint').textContent = t('sh.home.hint.' + gameChoice);
+}
+document.querySelectorAll('.game-pick [data-game]').forEach((b) => b.addEventListener('click', () => {
+  gameChoice = b.dataset.game;
+  try { localStorage.setItem('ghafoon-game', gameChoice); } catch (e) { /* ignore */ }
+  renderGamePick();
+}));
+$('btn-solo').onclick = () => { const name = requireName(); if (name) connect(() => send({ t: 'join', create: true, solo: true, name, game: gameChoice })); };
+$('btn-create').onclick = () => { const name = requireName(); if (name) connect(() => send({ t: 'join', create: true, name, game: gameChoice })); };
 $('btn-join').onclick = () => {
   const name = requireName();
   if (!name) return;
@@ -178,13 +192,16 @@ function render() {
   }
   if (S.mode === 'lobby') { renderLobby(); return; }
   show('game');
-  renderGame();
+  if (S.game === 'shelem') renderShelemGame();
+  else renderGame();
 }
 
 function renderLobby() {
   show('lobby');
   $('overlay').classList.add('hidden');
   $('lobby-code').textContent = S.room;
+  $('lobby-game').textContent = S.game === 'shelem' ? t('sh.name') : 'Ghafoon';
+  renderShelemOptions();
   $('share-link').value = `${location.origin}/#${S.room}`;
   const nameBox = $('lobby-name');
   if (document.activeElement !== nameBox) nameBox.value = S.seats[S.you].name;
@@ -242,6 +259,11 @@ const nameOf = (i) => dispName(S.seats[i]);
 const nm = (i) => iso(nameOf(i)); // for use inside a sentence
 
 function cardEl(c, cls = '') {
+  if (c >= 52) { // Shelem Jokers: 52 = Black, 53 = Color
+    return h('div', { class: `card joker ${c === 53 ? 'red color' : 'black'} ${cls}`, 'data-c': c, title: t(c === 53 ? 'sh.jokerColor' : 'sh.jokerBlack') },
+      h('div', { class: 'corner' }, h('span', { class: 'r long' }, 'JK'), h('span', { class: 's' }, '★')),
+      h('span', { class: 'pip' }, '★'));
+  }
   const s = suitOf(c);
   const face = rankLabel(rankOf(c));
   return h('div', { class: `card ${isRed(s) ? 'red' : ''} ${cls}`, 'data-c': c },
@@ -744,10 +766,12 @@ $('settings-close').addEventListener('click', () => setSettingsOpen(false));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettingsOpen(false); });
 I18N.onChange(() => {
   renderLangSwitches();
+  renderGamePick();
   $('home-msg').textContent = '';
   if (S) render();
 });
 renderLangSwitches();
+renderGamePick();
 
 // ------------------------------------------------------------- phones: orientation, sleep, wake lock
 

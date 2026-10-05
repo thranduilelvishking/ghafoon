@@ -373,3 +373,34 @@ body.fa .vsline, body.fa .toast, body.fa .actions, body.fa .actions .group, body
   .scoreboard .goal { white-space: nowrap; }
 }
 .modal .vs .plus, .scoreboard .big { direction: ltr; unicode-bidi: isolate; }
+
+/* ---------- Shelem: game picker, lobby options, Jokers, bid stepper */
+.game-pick { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 2px; }
+.seg { display: flex; border: 1px solid #2d5545; border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: #0b1f18; padding: 7px 16px; font-weight: 600; }
+.seg button.on { background: var(--accent); color: #231c05; }
+.tag.small { font-size: 12px; margin: 0 0 4px; min-height: 16px; }
+.game-name { font-size: 14px; color: var(--accent); font-weight: 600; }
+.sh-opts { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 4px; padding: 10px; border: 1px solid #2d5545; border-radius: 12px; background: #0b1f18aa; }
+.sh-opts h3 { margin: 0; font-size: 15px; }
+.fmts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fmt { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: start; padding: 8px 10px; border-radius: 10px; }
+.fmt span { font-size: 11px; font-weight: 400; color: var(--muted); line-height: 1.25; }
+.fmt.on { border-color: var(--accent); box-shadow: 0 0 10px #e8c15a66; background: #1d3a30; }
+.fmt:disabled { opacity: 1; cursor: default; }
+.opt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.opt.check { align-items: flex-start; }
+.opt small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; flex-basis: 100%; }
+.opt.check small { flex-basis: auto; }
+.opt input[type=number] { width: 100px; }
+.bidnum { min-width: 52px; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+.card.joker .pip { font-size: calc(var(--cw) * .6); }
+.card.joker.color { color: #d4202f; background: linear-gradient(135deg, #fff6e6 0%, #ffe3ea 55%, #e3f1ff 100%); }
+.card.joker.black { background: #f3f1ea; }
+.hokm-box .big.red { color: var(--red, #d4202f); }
+.modal .plus.minus { color: #ff7a8a; }
+.modal.shelem .big, .modal.shelem h2 { color: var(--accent); }
+@media (max-width: 640px) {
+  .fmts { grid-template-columns: 1fr; }
+  .fmt { flex-direction: row; flex-wrap: wrap; align-items: baseline; }
+}
