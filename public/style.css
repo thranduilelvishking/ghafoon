@@ -20,7 +20,7 @@
 html, body { margin: 0; height: 100%; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; background: var(--bg); color: var(--ink); font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 button, input { font: inherit; }
 .hidden { display: none !important; }
-#app { height: 100%; }
+#app { height: 100%; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); } /* iPhone home-screen app: stay clear of the status bar and notch */
 .screen { height: 100%; }
 
 /* ---------- home / lobby */
@@ -222,13 +222,14 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .modal .us .n { color: var(--us); } .modal .them .n { color: var(--them); }
 .modal .sub { color: var(--muted); font-size: 13px; }
 .toast.notice { background: #1d3a30; border-color: #3f8f6f; color: #d6ffee; }
-.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #3a1d22; border: 1px solid #a14455; color: #ffd6dc; padding: 8px 14px; border-radius: 10px; z-index: 20; max-width: 90vw; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #3a1d22; border: 1px solid #a14455; color: #ffd6dc; padding: 8px 14px; border-radius: 10px; z-index: 20; max-width: 90vw; }
 
 @supports (height: 100dvh) { #app, .screen { height: 100dvh; } }
 
 /* ---------- phones, portrait / narrow */
 @media (max-width: 640px) {
   :root { --cw: clamp(36px, min(10.5vw, 7vh), 56px); --top-off: 46px; }
+  .hand { --cw: clamp(48px, 14.5vw, 64px); --ch: calc(var(--cw) * 1.42); } /* your own cards are bigger than everything else on a phone */
   #game { padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
   .table { padding: 6px 6px 4px; border-radius: 20px; }
   .scoreboard .big { font-size: 20px; }
@@ -251,6 +252,7 @@ button.small { padding: 6px 10px; font-size: 13px; }
 /* ---------- phones, landscape (short screens) */
 @media (max-height: 520px) {
   :root { --cw: clamp(34px, 11vh, 52px); --top-off: 0px; }
+  .hand { --cw: clamp(40px, 13vh, 54px); --ch: calc(var(--cw) * 1.42); }
   #game { padding: 4px 8px calc(4px + env(safe-area-inset-bottom)); gap: 3px; }
   .room-tag { display: none; }
   .topbar { min-height: 30px; }
@@ -355,7 +357,7 @@ body.fa .vsline, body.fa .toast, body.fa .actions, body.fa .actions .group, body
 .gear.small { padding: 5px 9px; font-size: 16px; }
 .top-actions .flag-btn img { width: 30px; height: 20px; }
 
-.settings { position: fixed; top: 54px; inset-inline-end: 12px; z-index: 18; width: min(300px, calc(100vw - 24px)); background: #14231f; border: 1px solid #2b4a40; border-radius: 14px; box-shadow: 0 16px 50px #000a; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.settings { position: fixed; top: calc(54px + env(safe-area-inset-top)); inset-inline-end: 12px; z-index: 18; width: min(300px, calc(100vw - 24px)); background: #14231f; border: 1px solid #2b4a40; border-radius: 14px; box-shadow: 0 16px 50px #000a; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
 .settings-head { display: flex; justify-content: space-between; align-items: center; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .settings-row.check { justify-content: flex-start; gap: 10px; cursor: pointer; color: var(--ink); font-size: inherit; flex-direction: row; }
@@ -404,3 +406,16 @@ body.fa .vsline, body.fa .toast, body.fa .actions, body.fa .actions .group, body
   .fmts { grid-template-columns: 1fr; }
   .fmt { flex-direction: row; flex-wrap: wrap; align-items: baseline; }
 }
+
+/* short phones (iPhone SE size): a little smaller so the table still has room */
+@media (max-width: 640px) and (max-height: 700px) { .hand { --cw: clamp(44px, 12.5vw, 52px); --ch: calc(var(--cw) * 1.42); } }
+
+@media (max-width: 640px) and (max-height: 700px) { .mine { position: relative; z-index: 3; } .status { font-size: 13px; background: #0b1f18ee; border-radius: 10px; padding: 3px 8px; } }
+
+/* choosing cards to put down: more room between the cards, and a chosen card stays where it is (it wiggles and shows a tick)
+   instead of jumping up into the other row */
+.hand.pick.two .hrow + .hrow { margin-top: 8px; }
+.hand.pick .card.sel { transform: none; animation: wiggle .45s ease-in-out infinite; }
+.hand.pick .card.sel::after { content: '✓'; position: absolute; top: 3px; right: 3px; width: calc(var(--cw) * .36); height: calc(var(--cw) * .36); border-radius: 50%; background: var(--accent); color: #231c05; font-weight: 700; font-size: calc(var(--cw) * .26); line-height: 1; display: grid; place-items: center; }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .hand.pick .card.sel { animation: none; } }

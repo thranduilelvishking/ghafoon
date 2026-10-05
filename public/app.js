@@ -652,7 +652,8 @@ function layoutHand(box, els) {
   box.append(row1);
   const cw = els[0].getBoundingClientRect().width || 50;
   const avail = box.clientWidth - 12;
-  const maxStep = cw * 0.72;
+  const pick = box.classList.contains('pick'); // choosing cards to put down: spread them more
+  const maxStep = cw * (pick ? 0.92 : 0.72);
   const stepFor = (list) => {
     const gaps = list.filter((e) => e.dataset.gap).length * SUIT_GAP;
     return list.length > 1 ? (avail - cw - gaps) / (list.length - 1) : maxStep;
@@ -661,7 +662,7 @@ function layoutHand(box, els) {
     const step = Math.min(maxStep, stepFor(list));
     list.forEach((e, i) => { e.style.marginLeft = i === 0 ? '0' : `${step - cw + (e.dataset.gap ? SUIT_GAP : 0)}px`; });
   };
-  if (els.length > 9 && stepFor(els) < cw * 0.55) {
+  if (els.length > 9 && stepFor(els) < cw * (pick ? 0.8 : 0.55)) {
     // split near the middle, preferring a suit boundary
     let mid = Math.ceil(els.length / 2);
     for (let d = 0; d <= 3; d++) {
