@@ -668,23 +668,19 @@ function layoutHand(box, els) {
     const gaps = list.filter((e) => e.dataset.gap).length * SUIT_GAP;
     return list.length > 1 ? (avail - cw - gaps) / (list.length - 1) : maxStep;
   };
-  const apply = (list) => {
-    const step = Math.min(maxStep, stepFor(list));
+  const apply = (list, cap = maxStep) => {
+    const step = Math.min(cap, stepFor(list));
     list.forEach((e, i) => { e.style.marginLeft = i === 0 ? '0' : `${step - cw + (e.dataset.gap ? SUIT_GAP : 0)}px`; });
   };
   if (els.length > 9 && stepFor(els) < cw * (pick ? 0.8 : 0.55)) {
-    // split near the middle, preferring a suit boundary
-    let mid = Math.ceil(els.length / 2);
-    for (let d = 0; d <= 3; d++) {
-      const k = [mid - d, mid + d].find((x) => x > 2 && x < els.length - 2 && els[x].dataset.gap);
-      if (k) { mid = k; break; }
-    }
+    // two even rows (the first one takes the odd card)
+    const mid = Math.ceil(els.length / 2);
     const a = els.slice(0, mid);
     const b = els.slice(mid);
     row1.replaceChildren(...a);
     box.append(h('div', { class: 'hrow' }, b));
     box.classList.add('two');
-    [a, b].forEach((list) => { list[0].dataset.gap = ''; apply(list); });
+    [a, b].forEach((list) => { list[0].dataset.gap = ''; apply(list, cw * (pick ? 0.92 : 0.85)); }); // two rows can afford a roomier step
   } else {
     box.classList.remove('two');
     apply(els);
