@@ -223,8 +223,10 @@ function renderShelemActions() {
   }
 }
 
-// hands: Jokers first (they are the top Hokm cards), then the suits, high cards first
-const shSortKey = (c) => (isJokerCard(c) ? [-1, -c] : [suitOf(c), -rankOf(c)]);
+// hands: before Hokm is known the Jokers stand on their own at the left; once it is declared they join the Hokm suit as its
+// two highest cards (Color Joker, Black Joker, then the Ace...)
+const shSuit = (c) => (!isJokerCard(c) ? suitOf(c) : S.hokm != null ? S.hokm : -1);
+const shSortKey = (c) => (isJokerCard(c) ? [shSuit(c), c === 53 ? -16 : -15] : [suitOf(c), -rankOf(c)]);
 
 function renderShelemHand() {
   const box = $('hand');
@@ -234,7 +236,7 @@ function renderShelemHand() {
   if (!myTurn || !(S.hand || []).includes(armed)) armed = null;
   box.classList.toggle('pick', picking);
   const cards = (S.hand || []).slice().sort((a, b) => { const x = shSortKey(a); const y = shSortKey(b); return x[0] - y[0] || x[1] - y[1]; });
-  const suitKey = (c) => (isJokerCard(c) ? -1 : suitOf(c));
+  const suitKey = shSuit;
   const els = cards.map((c, idx) => {
     const cls = [];
     let onclick = null;
