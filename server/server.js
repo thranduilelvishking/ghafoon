@@ -10,6 +10,7 @@ const { Game, GameError, left } = require('./engine');
 const bots = require('./bots');
 const shelem = require('./shelem');
 const shelemBots = require('./shelemBots');
+const gamelog = require('./gamelog');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const PORT = +process.env.PORT || 3000;
@@ -525,6 +526,20 @@ class Room {
     this.changed();
   }
 
+  // What a human saw when they decided in Shelem (see gamelog.js); null when it is not a Shelem decision.
+  shelemSnapshot(seat) {
+    const g = this.game;
+    if (this.kind !== 'shelem' || !g) return null;
+    const played = [];
+    for (const t of g.trickLog) for (const p of t.plays) played.push(p.card);
+    return {
+      game: 'shelem', format: g.opts.format, topHokm: g.opts.topHokm, phase: g.phase, hand: g.hands[seat].slice(),
+      highest: g.highest, highSeat: g.highSeat, hakem: g.hakem, bids: g.bids.slice(), passed: g.passed.slice(), seat, dealer: g.dealer,
+      hokm: g.hokm, plays: g.plays.map((p) => ({ seat: p.seat, card: p.card })), played, discard: seat === g.hakem ? g.discard.slice() : [],
+      firstTrick: g.firstTrick, tricks: g.tricks.slice(), legal: g.legalFor(seat),
+    };
+  }
+
   // ---- messages from humans
   handle(ws, msg) {
     const seat = this.findToken(ws.ctx.token);
@@ -568,14 +583,20 @@ class Room {
         this.options = shelem.cleanOptions(msg, this.options);
         return this.changed();
       }
-      case 'bid':
+      case 'bid': {
         if (!g) return;
+        const snap = this.shelemSnapshot(seat);
         g.bid(seat, msg.value);
+        if (snap) gamelog.record({ ...snap, kind: 'bid', choice: msg.value });
         return this.changed();
-      case 'discard':
+      }
+      case 'discard': {
         if (!g) return;
+        const snap = this.shelemSnapshot(seat);
         g.hakemDiscard(seat, msg.discards);
+        if (snap) gamelog.record({ ...snap, kind: 'discard', choice: msg.discards });
         return this.changed();
+      }
       case 'hokm':
         if (!g || this.kind === 'shelem') return;
         g.chooseHokm(seat, msg.hokm);
@@ -594,8 +615,11 @@ class Room {
         return this.changed();
       case 'play':
         if (!g) return;
-        if (this.kind === 'shelem') g.play(seat, msg.card, msg.hokm);
-        else g.play(seat, msg.card);
+        if (this.kind === 'shelem') {
+          const snap = this.shelemSnapshot(seat);
+          g.play(seat, msg.card, msg.hokm);
+          if (snap) gamelog.record({ ...snap, kind: 'play', choice: msg.card, hokmNamed: msg.hokm });
+        } else g.play(seat, msg.card);
         return this.changed();
       case 'ready':
         if (!g || g.phase !== 'roundEnd') return;

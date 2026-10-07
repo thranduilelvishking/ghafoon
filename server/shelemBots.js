@@ -7,6 +7,22 @@ const S = require('./shelem');
 
 const { BLACK, COLOR, isJoker, cardPoints, hokmRank, isHokmCard, trickWinner, ShelemGame, FORMATS } = S;
 
+const fs = require('fs');
+const path = require('path');
+
+// What the bots have learned from human games (written by tools/train-shelem.js): how sure a bot must be of making a bid
+// before it makes it. Without the file the default stays.
+const TUNING_FILE = process.env.GHAFOON_TUNING_FILE || path.join(__dirname, 'shelem-tuning.json');
+const DEFAULT_TUNING = { bidThreshold: 0.62 };
+function loadTuning() {
+  try {
+    const t = JSON.parse(fs.readFileSync(TUNING_FILE, 'utf8'));
+    if (typeof t.bidThreshold === 'number' && t.bidThreshold > 0.2 && t.bidThreshold < 0.95) return { ...DEFAULT_TUNING, bidThreshold: t.bidThreshold };
+  } catch (e) { /* no tuning yet */ }
+  return { ...DEFAULT_TUNING };
+}
+const tuning = loadTuning();
+
 const rnd = Math.random;
 const shuffle = (a) => {
   const d = a.slice();
@@ -81,7 +97,16 @@ function choosePlay(g, seat) {
     const hk = bestHokm(hand);
     if (cfg.jokers && legal.includes(COLOR)) return { card: COLOR, hokm: hk };
     const inHokm = legal.filter((c) => !isJoker(c) && suitOf(c) === hk).sort((a, b) => rankOf(b) - rankOf(a));
-    if (inHokm.length) return { card: inHokm[0] };
+    if (inHokm.length) {
+      // With Jokers about, the Ace of Hokm is not the top card unless this hand holds both of them: do not spend it as
+      // the opening card, open with the lowest card of the suit and keep the Ace for a trick it can win.
+      const jokersElsewhere = cfg.jokers && !(hand.includes(BLACK) && hand.includes(COLOR));
+      if (inHokm.length > 1 && rankOf(inHokm[0]) === 14 && jokersElsewhere) {
+        const rest = inHokm.slice(1).sort((a, b) => cardPoints(a, cfg) - cardPoints(b, cfg) || rankOf(a) - rankOf(b));
+        return { card: rest[0] };
+      }
+      return { card: inHokm[0] };
+    }
     const any = legal.slice().sort((a, b) => rankOf(b) - rankOf(a))[0];
     return { card: any, hokm: isJoker(any) ? hk : undefined };
   }
@@ -119,7 +144,11 @@ function choosePlay(g, seat) {
   const partnerWins = teamOf(current) === me;
   const last = g.plays.length === 3;
   const wins = (c) => trickWinner(g.plays.concat([{ seat, card: c }]), hokm) === seat;
-  const winners = legal.filter(wins).sort((a, b) => strength(a, hokm) - strength(b, hokm));
+  let winners = legal.filter(wins).sort((a, b) => strength(a, hokm) - strength(b, hokm));
+  // do not throw the Ace of Hokm into a trick that a Joker still to come could take, unless the trick is worth a lot
+  const trickPts = g.plays.reduce((a, p) => a + points(p.card), 0);
+  const aceAtRisk = (c) => cfg.jokers && !isJoker(c) && suitOf(c) === hokm && rankOf(c) === 14 && !last && trickPts < 20 && !isMaster(c, hand, played, hokm, cfg);
+  if (winners.some(aceAtRisk) && legal.some((c) => !aceAtRisk(c))) winners = winners.filter((c) => !aceAtRisk(c));
   const dump = () => legal.slice().sort((a, b) => points(b) - points(a) || strength(a, hokm) - strength(b, hokm));
   const lowest = () => legal.slice().sort((a, b) => (isHokmCard(a, hokm) ? 1 : 0) - (isHokmCard(b, hokm) ? 1 : 0)
     || points(a) - points(b) || strength(a, hokm) - strength(b, hokm));
@@ -170,21 +199,30 @@ function simulate(opts, seat, hand, bidLevel) {
 
 const memo = new WeakMap(); // game -> Map(seat key -> the highest bid worth making)
 
+// The simulated results of this hand as the Hakem: team totals and whether it was a Shelem, `n` deals.
+function sampleBids(opts, seat, hand, n = 36) {
+  const { minBid } = FORMATS[opts.format];
+  const results = [];
+  for (let i = 0; i < n; i++) results.push(simulate(opts, seat, hand, minBid));
+  return results.map((r) => ({ total: r.totals[teamOf(seat)], shelem: r.outcome === 'shelem' }));
+}
+
+// The highest bid worth making, given those samples and how sure the bot has to be.
+function bidFromSamples(cfg, samples, threshold = tuning.bidThreshold) {
+  let best = 0;
+  for (let b = cfg.minBid; b <= cfg.maxBid; b += 5) {
+    const made = samples.filter((x) => x.total >= b || x.shelem).length / samples.length;
+    if (made >= threshold) best = b;
+  }
+  return best;
+}
+
 function bestBid(g, seat) {
   let m = memo.get(g);
   if (!m) { m = new Map(); memo.set(g, m); }
   const key = `${g.round}:${g.redeals}:${seat}`;
   if (m.has(key)) return m.get(key);
-  const { minBid, maxBid } = g.cfg;
-  const results = [];
-  for (let i = 0; i < 36; i++) results.push(simulate(g.opts, seat, g.hands[seat], minBid));
-  const totals = results.map((r) => r.totals[teamOf(seat)]);
-  const shelems = results.map((r) => r.outcome === 'shelem');
-  let best = 0;
-  for (let b = minBid; b <= maxBid; b += 5) {
-    const made = totals.filter((t, i) => t >= b || shelems[i]).length / totals.length;
-    if (made >= 0.62) best = b;
-  }
+  const best = bidFromSamples(g.cfg, sampleBids(g.opts, seat, g.hands[seat]));
   m.set(key, best);
   return best;
 }
@@ -203,4 +241,4 @@ function chooseWidowDiscards(g, seat) {
   return chooseDiscards(hand, g.cfg.widow, bestHokm(hand));
 }
 
-module.exports = { bestHokm, chooseDiscards, choosePlay, chooseBid, chooseWidowDiscards, simulate };
+module.exports = { bestHokm, chooseDiscards, choosePlay, chooseBid, chooseWidowDiscards, simulate, sampleBids, bidFromSamples, tuning, TUNING_FILE, DEFAULT_TUNING };
